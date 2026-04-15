@@ -1,0 +1,115 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: modbus_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: modbus_fw
+      POSTGRES_USER: modbus
+      POSTGRES_PASSWORD: modbuspassword
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./services/db/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - modbus_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U modbus -d modbus_fw"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: modbus_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - ./data/redis:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - modbus_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ./services/backend
+      dockerfile: Dockerfile
+    container_name: modbus_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_ENV: development
+      LOG_LEVEL: INFO
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: modbus_fw
+      DB_USER: modbus
+      DB_PASSWORD: modbuspassword
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CAPTURE_INTERFACE: eth1
+      TZ: Europe/Copenhagen
+    volumes:
+      - ./services/backend:/app
+      - ./data/logs/backend:/app/logs
+      - ./data/pcap:/app/pcap
+    working_dir: /app
+    command: python app/main.py
+    networks:
+      - modbus_net
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    security_opt:
+      - no-new-privileges:true
+
+  frontend:
+    build:
+      context: ./services/frontend
+      dockerfile: Dockerfile
+    container_name: modbus_frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_ENV: development
+      FLASK_ENV: development
+      FLASK_APP: app/main.py
+      API_BASE_URL: http://backend:8000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: modbus_fw
+      DB_USER: modbus
+      DB_PASSWORD: modbuspassword
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      TZ: Europe/Copenhagen
+    volumes:
+      - ./services/frontend:/app
+      - ./data/logs/frontend:/app/logs
+    working_dir: /app
+    command: flask run --host=0.0.0.0 --port=5000
+    ports:
+      - "5000:5000"
+    networks:
+      - modbus_net
+
+networks:
+  modbus_net:
+    driver: bridge
