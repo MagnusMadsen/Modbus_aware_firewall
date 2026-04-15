@@ -70,6 +70,8 @@ services:
     command: python app/main.py
     networks:
       - modbus_net
+    ports:
+      - "8000:8000"
     cap_add:
       - NET_ADMIN
       - NET_RAW
@@ -85,26 +87,15 @@ services:
     depends_on:
       backend:
         condition: service_started
-      postgres:
-        condition: service_healthy
     environment:
       APP_ENV: development
-      FLASK_ENV: development
-      FLASK_APP: app/main.py
       API_BASE_URL: http://backend:8000
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: modbus_fw
-      DB_USER: modbus
-      DB_PASSWORD: modbuspassword
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
       TZ: Europe/Copenhagen
     volumes:
       - ./services/frontend:/app
       - ./data/logs/frontend:/app/logs
     working_dir: /app
-    command: flask run --host=0.0.0.0 --port=5000
+    command: python app/main.py
     ports:
       - "5000:5000"
     networks:
