@@ -82,27 +82,26 @@ services:
       context: ./services/frontend
       dockerfile: Dockerfile
     container_name: modbus_frontend
-    restart: unless-stopped
     depends_on:
       backend:
         condition: service_started
     environment:
-      APP_ENV: development
       API_BASE_URL: http://backend:8000
+      APP_ENV: development
       TZ: Europe/Copenhagen
       APP_USERNAME: admin
     secrets:
       - frontend_secret_key
       - frontend_password_hash
+    networks:
+      - modbus_net
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
     volumes:
       - ./services/frontend:/app
       - ./data/logs/frontend:/app/logs
     working_dir: /app
-    command: python app/main.py
-    ports:
-      - "5000:5000"
-    networks:
-      - modbus_net
 
 networks:
   modbus_net:
