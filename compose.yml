@@ -106,3 +106,9 @@ services:
 networks:
   modbus_net:
     driver: bridge
+
+secrets:
+  frontend_secret_key:
+    file: ./secrets/frontend_secret_key.txt
+  frontend_password_hash:
+    file: ./secrets/frontend_password_hash.txt
