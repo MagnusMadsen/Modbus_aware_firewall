@@ -91,8 +91,9 @@ services:
       API_BASE_URL: http://backend:8000
       TZ: Europe/Copenhagen
       APP_USERNAME: admin
-      SERCRET_KEY: c241851385183a7b072ba3737f43c7de732fb140d2ba011f951d2f762655564d
-      APP_PASSWORD_HASH: "scrypt:32768:8:1$701kA64utEIqfqv6$5d68a5130cac67e629552e4460c856d819e78deb770e590843f1bd64095aa5cd965e0ebc4a3fd5bbe1ba0f70baac3034f8c0f957a4128a5aa4aea95ad6f58b87"
+      secrets:
+      - frontend_secret_key
+      - frontend_password_hash
     volumes:
       - ./services/frontend:/app
       - ./data/logs/frontend:/app/logs
