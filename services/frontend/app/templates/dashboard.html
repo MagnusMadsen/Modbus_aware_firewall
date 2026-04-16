@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Modbus Aware Firewall Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-mark">M</div>
+                <div>
+                    <h1>Modbus Aware</h1>
+                    <p>OT Monitoring Dashboard</p>
+                </div>
+            </div>
+
+            <nav class="nav">
+                <a class="nav-item active" href="#">Dashboard</a>
+                <a class="nav-item" href="#">Alerts</a>
+                <a class="nav-item" href="#">Assets</a>
+                <a class="nav-item" href="#">Traffic</a>
+                <a class="nav-item" href="#">Policies</a>
+                <a class="nav-item" href="#">Sensor</a>
+            </nav>
+
+            <div class="sidebar-card">
+                <h3>Sensor State</h3>
+                <ul class="status-list">
+                    <li><span>Sensor</span><strong>{{ data.sensor.status }}</strong></li>
+                    <li><span>Capture</span><strong>{{ data.sensor.capture }}</strong></li>
+                    <li><span>Interface</span><strong>{{ data.sensor.interface }}</strong></li>
+                    <li><span>Postgres</span><strong>{{ data.sensor.db }}</strong></li>
+                    <li><span>Redis</span><strong>{{ data.sensor.redis }}</strong></li>
+                </ul>
+            </div>
+        </aside>
+
+        <main class="main">
+            <header class="topbar">
+                <div>
+                    <p class="eyebrow">Industrial Monitoring</p>
+                    <h2>Network Security Overview</h2>
+                    <p class="subtle">Last update: {{ data.generated_at }}</p>
+                </div>
+                <div class="topbar-actions">
+                    <span class="pill success">Sensor {{ data.sensor.status }}</span>
+                    <span class="pill">Interface {{ data.sensor.interface }}</span>
+                </div>
+            </header>
+
+            <section class="kpi-grid">
+                {% for item in data.kpis %}
+                <div class="card kpi-card">
+                    <p class="kpi-label">{{ item.label }}</p>
+                    <div class="kpi-row">
+                        <h3>{{ item.value }}</h3>
+                        <span class="badge {{ item.severity }}">{{ item.delta }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </section>
+
+            <section class="content-grid">
+                <div class="card panel-large">
+                    <div class="panel-header">
+                        <div>
+                            <h3>Recent Events</h3>
+                            <p>Latest Modbus activity and enforcement decisions</p>
+                        </div>
+                    </div>
+
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Severity</th>
+                                    <th>Source</th>
+                                    <th>Target</th>
+                                    <th>Function</th>
+                                    <th>Event</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in data.events %}
+                                <tr>
+                                    <td>{{ row.time }}</td>
+                                    <td><span class="badge {{ row.severity|lower }}">{{ row.severity }}</span></td>
+                                    <td>{{ row.source }}</td>
+                                    <td>{{ row.target }}</td>
+                                    <td>{{ row.function }}</td>
+                                    <td>{{ row.event }}</td>
+                                    <td>{{ row.action }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="stack">
+                    <div class="card">
+                        <div class="panel-header">
+                            <div>
+                                <h3>Active Alerts</h3>
+                                <p>Unresolved detections and anomalies</p>
+                            </div>
+                        </div>
+
+                        <div class="alert-list">
+                            {% for alert in data.alerts %}
+                            <div class="alert-item">
+                                <div class="alert-top">
+                                    <span class="badge {{ alert.severity|lower }}">{{ alert.severity }}</span>
+                                    <span class="subtle">{{ alert.time }}</span>
+                                </div>
+                                <h4>{{ alert.title }}</h4>
+                                <p>{{ alert.asset }} · {{ alert.source }}</p>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="panel-header">
+                            <div>
+                                <h3>Traffic Mix</h3>
+                                <p>Observed Modbus function activity</p>
+                            </div>
+                        </div>
+
+                        <div class="traffic-list">
+                            {% for item in data.traffic %}
+                            <div class="traffic-row">
+                                <span>{{ item.label }}</span>
+                                <strong>{{ item.value }}</strong>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="card">
+                <div class="panel-header">
+                    <div>
+                        <h3>Assets</h3>
+                        <p>Known devices on the OT segment</p>
+                    </div>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>IP</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Risk</th>
+                                <th>Last Seen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for asset in data.assets %}
+                            <tr>
+                                <td>{{ asset.name }}</td>
+                                <td>{{ asset.ip }}</td>
+                                <td>{{ asset.role }}</td>
+                                <td>{{ asset.status }}</td>
+                                <td>{{ asset.risk }}</td>
+                                <td>{{ asset.last_seen }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+</body>
+</html>
