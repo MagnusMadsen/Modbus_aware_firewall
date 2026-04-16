@@ -1,20 +1,5 @@
 <!doctype html>
 <html lang="en">
-
-<header class="topbar">
-    <div>
-        <p class="eyebrow">Industrial Monitoring</p>
-        <h2>Network Security Overview</h2>
-        <p class="subtle">Last update: {{ data.generated_at }}</p>
-    </div>
-    <div class="topbar-actions">
-        <span class="pill">User {{ username }}</span>
-        <span class="pill success">Sensor {{ data.sensor.status }}</span>
-        <span class="pill">Interface {{ data.sensor.interface }}</span>
-        <a class="logout-link" href="{{ url_for('logout') }}">Logout</a>
-    </div>
-</header>
-
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -60,9 +45,12 @@
                     <h2>Network Security Overview</h2>
                     <p class="subtle">Last update: {{ data.generated_at }}</p>
                 </div>
+
                 <div class="topbar-actions">
+                    <span class="pill">User {{ username }}</span>
                     <span class="pill success">Sensor {{ data.sensor.status }}</span>
                     <span class="pill">Interface {{ data.sensor.interface }}</span>
+                    <a class="logout-link" href="{{ url_for('logout') }}">Logout</a>
                 </div>
             </header>
 
