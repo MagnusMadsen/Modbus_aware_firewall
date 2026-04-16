@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 from werkzeug.security import check_password_hash
 import os
@@ -21,14 +21,13 @@ def read_secret(secret_name: str) -> str:
 
 app = Flask(__name__)
 
+app.secret_key = read_secret("frontend_secret_key")
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=False,
-    PERMANENT_SESSION_LIFETIME=3600,
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=1),
 )
-
-app.secret_key = read_secret("frontend_secret_key")
 
 USERNAME = os.getenv("APP_USERNAME")
 if not USERNAME:
@@ -179,3 +178,4 @@ def index():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+    

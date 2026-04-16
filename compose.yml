@@ -102,6 +102,7 @@ services:
       - ./services/frontend:/app
       - ./data/logs/frontend:/app/logs
     working_dir: /app
+    command: python app/main.py
 
 networks:
   modbus_net:
