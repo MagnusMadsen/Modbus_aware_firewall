@@ -91,7 +91,7 @@ services:
       API_BASE_URL: http://backend:8000
       TZ: Europe/Copenhagen
       APP_USERNAME: admin
-      secrets:
+    secrets:
       - frontend_secret_key
       - frontend_password_hash
     volumes:
