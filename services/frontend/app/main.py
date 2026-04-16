@@ -1,12 +1,30 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 from datetime import datetime
+from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
+import os
 
 app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", "change-this-in-production")
+
+USERNAME = os.getenv("APP_USERNAME", "admin")
+PASSWORD_HASH = os.getenv(
+    "APP_PASSWORD_HASH",
+    generate_password_hash("admin1234")
+)
 
 
-@app.route("/")
-def index():
-    dashboard_data = {
+def login_required(view_func):
+    @wraps(view_func)
+    def wrapped_view(*args, **kwargs):
+        if not session.get("authenticated"):
+            return redirect(url_for("login"))
+        return view_func(*args, **kwargs)
+    return wrapped_view
+
+
+def get_dashboard_data():
+    return {
         "generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
         "sensor": {
             "status": "Online",
@@ -98,7 +116,33 @@ def index():
         ],
     }
 
-    return render_template("dashboard.html", data=dashboard_data)
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+
+        if username == USERNAME and check_password_hash(PASSWORD_HASH, password):
+            session["authenticated"] = True
+            session["username"] = username
+            return redirect(url_for("index"))
+
+        flash("Invalid username or password", "error")
+
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+@app.route("/")
+@login_required
+def index():
+    return render_template("dashboard.html", data=get_dashboard_data(), username=session.get("username"))
 
 
 if __name__ == "__main__":
