@@ -1,17 +1,40 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from datetime import datetime
 from functools import wraps
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import check_password_hash
 import os
 
-app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "change-this-in-production")
 
-USERNAME = os.getenv("APP_USERNAME", "admin")
-PASSWORD_HASH = os.getenv(
-    "APP_PASSWORD_HASH",
-    generate_password_hash("admin1234")
+def read_secret(secret_name: str) -> str:
+    path = f"/run/secrets/{secret_name}"
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            value = f.read().strip()
+    except FileNotFoundError as exc:
+        raise RuntimeError(f"Missing required secret: {secret_name}") from exc
+
+    if not value:
+        raise RuntimeError(f"Secret is empty: {secret_name}")
+
+    return value
+
+
+app = Flask(__name__)
+
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=False,
+    PERMANENT_SESSION_LIFETIME=3600,
 )
+
+app.secret_key = read_secret("frontend_secret_key")
+
+USERNAME = os.getenv("APP_USERNAME")
+if not USERNAME:
+    raise RuntimeError("APP_USERNAME is not set")
+
+PASSWORD_HASH = read_secret("frontend_password_hash")
 
 
 def login_required(view_func):
@@ -119,13 +142,18 @@ def get_dashboard_data():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    if session.get("authenticated"):
+        return redirect(url_for("index"))
+
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
 
         if username == USERNAME and check_password_hash(PASSWORD_HASH, password):
+            session.clear()
             session["authenticated"] = True
             session["username"] = username
+            session.permanent = True
             return redirect(url_for("index"))
 
         flash("Invalid username or password", "error")
@@ -142,7 +170,11 @@ def logout():
 @app.route("/")
 @login_required
 def index():
-    return render_template("dashboard.html", data=get_dashboard_data(), username=session.get("username"))
+    return render_template(
+        "dashboard.html",
+        data=get_dashboard_data(),
+        username=session.get("username")
+    )
 
 
 if __name__ == "__main__":
