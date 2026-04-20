@@ -13,17 +13,17 @@
                 <div class="brand-mark">M</div>
                 <div>
                     <h1>Modbus Aware</h1>
-                    <p>Modbus-first OT enforcement</p>
+                    <p>Production-focused OT visibility</p>
                 </div>
             </div>
 
             <nav class="nav">
                 <a class="nav-item active" href="#">Overview</a>
                 <a class="nav-item" href="#">Assets</a>
-                <a class="nav-item" href="#">Flows</a>
-                <a class="nav-item" href="#">Modbus Inspector</a>
+                <a class="nav-item" href="#">Network</a>
+                <a class="nav-item" href="#">Modbus</a>
                 <a class="nav-item" href="#">Policies</a>
-                <a class="nav-item" href="#">Alerts</a>
+                <a class="nav-item" href="#">Response</a>
             </nav>
 
             <div class="sidebar-card">
@@ -35,12 +35,12 @@
                     <li><span>Interface</span><strong>{{ data.sensor.interface }}</strong></li>
                     <li><span>Postgres</span><strong>{{ data.sensor.db }}</strong></li>
                     <li><span>Redis</span><strong>{{ data.sensor.redis }}</strong></li>
-                    <li><span>Policy Engine</span><strong>{{ data.sensor.policy_engine }}</strong></li>
+                    <li><span>Policy</span><strong>{{ data.sensor.policy_engine }}</strong></li>
                 </ul>
             </div>
 
             <div class="sidebar-card">
-                <h3>Zone Map</h3>
+                <h3>Zones</h3>
                 <div class="zone-list">
                     {% for zone in data.zones %}
                     <div class="zone-item">
@@ -48,7 +48,7 @@
                             <strong>{{ zone.name }}</strong>
                             <p>{{ zone.value }}</p>
                         </div>
-                        <span class="badge {{ zone.state|lower }}">{{ zone.state }}</span>
+                        <span class="badge {{ zone.state }}">{{ zone.state }}</span>
                     </div>
                     {% endfor %}
                 </div>
@@ -59,7 +59,7 @@
             <header class="topbar">
                 <div>
                     <p class="eyebrow">Industrial Monitoring</p>
-                    <h2>Modbus Enforcement Overview</h2>
+                    <h2>Production Network Impact Dashboard</h2>
                     <p class="subtle">Last update: {{ data.generated_at }}</p>
                 </div>
 
@@ -87,32 +87,24 @@
                 <div class="card panel-large">
                     <div class="panel-header">
                         <div>
-                            <h3>Live OT Flows</h3>
-                            <p>Master to slave relationships with inline decision state</p>
+                            <h3>Live Network Map</h3>
+                            <p>Who is talking to what, and whether traffic is safe</p>
                         </div>
                     </div>
 
-                    <div class="flow-grid">
-                        {% for flow in data.flows %}
-                        <div class="flow-card">
-                            <div class="flow-top">
-                                <span class="badge {{ flow.state|lower }}">{{ flow.state }}</span>
-                                <span class="subtle">{{ flow.service }}</span>
-                            </div>
-                            <div class="flow-path">
-                                <div>
-                                    <strong>{{ flow.source }}</strong>
-                                    <p>{{ flow.src_ip }}</p>
-                                </div>
-                                <span class="flow-arrow">→</span>
-                                <div>
-                                    <strong>{{ flow.target }}</strong>
-                                    <p>{{ flow.dst_ip }}</p>
-                                </div>
-                            </div>
-                            <div class="flow-meta">
-                                <span>Unit ID {{ flow.unit_id }}</span>
-                            </div>
+                    <div class="network-map">
+                        {% for link in data.network_links %}
+                        <div class="net-link {{ link.state }}"
+                             style="left: {{ link.from_x }}; top: {{ link.from_y }}; width: 54%;">
+                            <span>{{ link.label }}</span>
+                        </div>
+                        {% endfor %}
+
+                        {% for node in data.network_nodes %}
+                        <div class="net-node {{ node.status }}" style="left: {{ node.x }}; top: {{ node.y }};">
+                            <strong>{{ node.name }}</strong>
+                            <span>{{ node.role }}</span>
+                            <small>{{ node.ip }}</small>
                         </div>
                         {% endfor %}
                     </div>
@@ -122,21 +114,22 @@
                     <div class="card">
                         <div class="panel-header">
                             <div>
-                                <h3>Active Alerts</h3>
-                                <p>Unresolved detections and policy outcomes</p>
+                                <h3>Operator Actions</h3>
+                                <p>Immediate actions for production staff</p>
                             </div>
                         </div>
 
-                        <div class="alert-list">
-                            {% for alert in data.alerts %}
-                            <div class="alert-item">
-                                <div class="alert-top">
-                                    <span class="badge {{ alert.severity|lower }}">{{ alert.severity }}</span>
-                                    <span class="subtle">{{ alert.time }}</span>
+                        <div class="action-list">
+                            {% for item in data.operator_actions %}
+                            <div class="action-item">
+                                <div class="action-top">
+                                    <span class="badge {% if item.priority == 'Immediate' %}critical{% elif item.priority == 'High' %}warning{% else %}normal{% endif %}">
+                                        {{ item.priority }}
+                                    </span>
+                                    <span class="subtle">{{ item.owner }}</span>
                                 </div>
-                                <h4>{{ alert.title }}</h4>
-                                <p>{{ alert.asset }} · {{ alert.source }}</p>
-                                <div class="alert-decision">{{ alert.decision }}</div>
+                                <h4>{{ item.title }}</h4>
+                                <p>{{ item.text }}</p>
                             </div>
                             {% endfor %}
                         </div>
@@ -146,18 +139,75 @@
                         <div class="panel-header">
                             <div>
                                 <h3>Function Mix</h3>
-                                <p>Observed Modbus function activity</p>
+                                <p>Current Modbus behaviour</p>
                             </div>
                         </div>
 
-                        <div class="traffic-list">
-                            {% for item in data.modbus_summary %}
-                            <div class="traffic-row">
-                                <span>{{ item.label }}</span>
-                                <strong>{{ item.value }}</strong>
+                        <div class="bar-list">
+                            {% for item in data.function_mix %}
+                            <div class="bar-item">
+                                <div class="bar-head">
+                                    <span>{{ item.label }} {{ item.name }}</span>
+                                    <strong>{{ item.value }}</strong>
+                                </div>
+                                <div class="bar-track">
+                                    <div class="bar-fill" style="width: {{ item.pct }}%;"></div>
+                                </div>
                             </div>
                             {% endfor %}
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="visual-grid">
+                <div class="card">
+                    <div class="panel-header">
+                        <div>
+                            <h3>Traffic Timeline</h3>
+                            <p>Allowed versus blocked traffic over time</p>
+                        </div>
+                    </div>
+
+                    <div class="timeline-chart">
+                        {% for point in data.timeline %}
+                        <div class="timeline-col">
+                            <div class="timeline-bars">
+                                <div class="timeline-bar blocked" style="height: {{ point.blocked * 12 }}px;"></div>
+                                <div class="timeline-bar allowed" style="height: {{ point.allowed * 6 }}px;"></div>
+                            </div>
+                            <span>{{ point.time }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="chart-legend">
+                        <span><i class="legend-dot allowed"></i>Allowed</span>
+                        <span><i class="legend-dot blocked"></i>Blocked</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="panel-header">
+                        <div>
+                            <h3>Register Heatmap</h3>
+                            <p>Which address ranges are most exposed</p>
+                        </div>
+                    </div>
+
+                    <div class="heatmap-list">
+                        {% for item in data.register_heatmap %}
+                        <div class="heat-row">
+                            <div class="heat-label">
+                                <strong>{{ item.range }}</strong>
+                                <p>{{ item.label }}</p>
+                            </div>
+                            <div class="heat-bar">
+                                <div class="heat-fill {{ item.risk }}" style="width: {{ item.level }}%;"></div>
+                            </div>
+                            <span class="heat-value">{{ item.level }}</span>
+                        </div>
+                        {% endfor %}
                     </div>
                 </div>
             </section>
@@ -206,21 +256,21 @@
                 <div class="card">
                     <div class="panel-header">
                         <div>
-                            <h3>Policy Status</h3>
-                            <p>Current rule activity and enforcement mode</p>
+                            <h3>Active Alerts</h3>
+                            <p>Unresolved detections and policy outcomes</p>
                         </div>
                     </div>
 
-                    <div class="policy-list">
-                        {% for policy in data.policies %}
-                        <div class="policy-item">
-                            <div class="policy-top">
-                                <h4>{{ policy.name }}</h4>
-                                <span class="badge {% if policy.mode == 'Enforce' %}critical{% else %}warning{% endif %}">{{ policy.mode }}</span>
+                    <div class="alert-list">
+                        {% for alert in data.alerts %}
+                        <div class="alert-item">
+                            <div class="alert-top">
+                                <span class="badge {{ alert.severity|lower }}">{{ alert.severity }}</span>
+                                <span class="subtle">{{ alert.time }}</span>
                             </div>
-                            <p>{{ policy.scope }}</p>
-                            <p class="policy-rule">{{ policy.rule }}</p>
-                            <div class="policy-hits">{{ policy.hits }} hits</div>
+                            <h4>{{ alert.title }}</h4>
+                            <p>{{ alert.asset }} · {{ alert.source }}</p>
+                            <div class="alert-decision">{{ alert.decision }}</div>
                         </div>
                         {% endfor %}
                     </div>
@@ -229,75 +279,21 @@
                 <div class="card">
                     <div class="panel-header">
                         <div>
-                            <h3>Register Exposure</h3>
-                            <p>Most active Modbus address ranges</p>
+                            <h3>Transaction Inspector</h3>
+                            <p>Why the firewall reacted</p>
                         </div>
                     </div>
 
-                    <div class="register-list">
-                        {% for item in data.top_registers %}
-                        <div class="register-item">
-                            <div>
-                                <strong>{{ item.range }}</strong>
-                                <p>{{ item.purpose }}</p>
-                            </div>
-                            <div class="register-meta">
-                                <span>{{ item.writes }} writes</span>
-                                <span class="badge {{ item.risk|lower }}">{{ item.risk }}</span>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-            </section>
-
-            <section class="content-grid inspector-grid">
-                <div class="card">
-                    <div class="panel-header">
-                        <div>
-                            <h3>Modbus Inspector</h3>
-                            <p>Deep transaction detail and rule explanation</p>
-                        </div>
-                    </div>
-
-                    <div class="inspector-grid-inner">
-                        <div class="inspector-row">
-                            <span>Source</span>
-                            <strong>{{ data.inspector.source }}</strong>
-                        </div>
-                        <div class="inspector-row">
-                            <span>Destination</span>
-                            <strong>{{ data.inspector.destination }}</strong>
-                        </div>
-                        <div class="inspector-row">
-                            <span>Unit ID</span>
-                            <strong>{{ data.inspector.unit_id }}</strong>
-                        </div>
-                        <div class="inspector-row">
-                            <span>Transaction ID</span>
-                            <strong>{{ data.inspector.transaction_id }}</strong>
-                        </div>
-                        <div class="inspector-row">
-                            <span>Function</span>
-                            <strong>{{ data.inspector.function_code }}</strong>
-                        </div>
-                        <div class="inspector-row">
-                            <span>Register Range</span>
-                            <strong>{{ data.inspector.register_range }}</strong>
-                        </div>
-                        <div class="inspector-row">
-                            <span>Values</span>
-                            <strong>{{ data.inspector.values }}</strong>
-                        </div>
-                        <div class="inspector-row">
-                            <span>Decision</span>
-                            <strong class="decision blocked">{{ data.inspector.decision }}</strong>
-                        </div>
-                        <div class="inspector-row full">
-                            <span>Matched Rule</span>
-                            <strong>{{ data.inspector.rule }}</strong>
-                        </div>
-                        <div class="inspector-explainer">
+                    <div class="inspector-grid">
+                        <div class="inspector-row"><span>Source</span><strong>{{ data.inspector.source }}</strong></div>
+                        <div class="inspector-row"><span>Destination</span><strong>{{ data.inspector.destination }}</strong></div>
+                        <div class="inspector-row"><span>Unit ID</span><strong>{{ data.inspector.unit_id }}</strong></div>
+                        <div class="inspector-row"><span>Transaction</span><strong>{{ data.inspector.transaction_id }}</strong></div>
+                        <div class="inspector-row"><span>Function</span><strong>{{ data.inspector.function_code }}</strong></div>
+                        <div class="inspector-row"><span>Range</span><strong>{{ data.inspector.register_range }}</strong></div>
+                        <div class="inspector-row full"><span>Decision</span><strong class="decision blocked">{{ data.inspector.decision }}</strong></div>
+                        <div class="inspector-row full"><span>Matched Rule</span><strong>{{ data.inspector.rule }}</strong></div>
+                        <div class="inspector-note">
                             <h4>Reason</h4>
                             <p>{{ data.inspector.reason }}</p>
                         </div>
