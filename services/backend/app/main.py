@@ -1,6 +1,6 @@
 from flask import Flask, jsonify
-from app.capture import start_capture
-from app.parser import parse_packet
+from capture import start_capture
+from parser import parse_packet
 
 import threading
 import os
