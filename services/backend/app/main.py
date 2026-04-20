@@ -10,7 +10,7 @@ CAPTURE_INTERFACE = os.getenv("CAPTURE_INTERFACE", "eth0")
 app = Flask(__name__)
 
 def save_packet(data):
-    print(data)
+    print("PACKET:", data, flush=True)
 
 def run_capture():
     start_capture(CAPTURE_INTERFACE, lambda pkt: save_packet(parse_packet(pkt)))
