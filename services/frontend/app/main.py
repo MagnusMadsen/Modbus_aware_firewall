@@ -88,7 +88,15 @@ def get_dashboard_data():
         devices_json = devices_resp.json()
 
         data["generated_at"] = dashboard_json.get("generated_at", data["generated_at"])
+        data["sensor"] = dashboard_json.get("sensor", data["sensor"])
         data["summary"] = dashboard_json.get("summary", data["summary"])
+        data["combined_series"] = dashboard_json.get("combined_series", data["combined_series"])
+        data["chart_events"] = dashboard_json.get("chart_events", data["chart_events"])
+        data["combined_note"] = dashboard_json.get("combined_note", data["combined_note"])
+        data["arp_monitor"] = dashboard_json.get("arp_monitor", data["arp_monitor"])
+        data["connections"] = dashboard_json.get("connections", data["connections"])
+        data["ports"] = dashboard_json.get("ports", data["ports"])
+        data["events"] = dashboard_json.get("events", data["events"])
         data["devices"] = devices_json
 
     except Exception as exc:
