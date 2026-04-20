@@ -1,6 +1,19 @@
 from flask import Flask, jsonify
+from app.capture import start_capture
+
+import threading
+import os
+from app.parser import parse_packet
+
+CAPTURE_INTERFACE = os.getenv("CAPTURE_INTERFACE", "eth0")
 
 app = Flask(__name__)
+
+def run_capture():
+    start_capture(CAPTURE_INTERFACE, lambda pkt: save_packet(parse_packet(pkt)))
+
+capture_thread = threading.Thread(target=run_capture, daemon=True)
+capture_thread.start()
 
 @app.route("/health")
 def health():
