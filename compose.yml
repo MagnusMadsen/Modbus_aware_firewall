@@ -59,7 +59,7 @@ services:
       DB_PASSWORD: modbuspassword
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      CAPTURE_INTERFACE: eth1
+      CAPTURE_INTERFACE: eth0
       TZ: Europe/Copenhagen
     volumes:
       - ./services/backend:/app
