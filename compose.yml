@@ -16,7 +16,7 @@ services:
     networks:
       - modbus_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U modbus -d modbus_fw"]
+      test: ["CMD-SHELL", "pg_isready -U admin -d modbus_fw"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -55,8 +55,8 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: modbus_fw
-      DB_USER: modbus
-      DB_PASSWORD: modbuspassword
+      DB_USER: admin
+      DB_PASSWORD: Admin1234!
       REDIS_HOST: redis
       REDIS_PORT: 6379
       CAPTURE_INTERFACE: eth0

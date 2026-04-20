@@ -6,6 +6,6 @@ def get_connection():
         host=os.getenv("DB_HOST", "postgres"),
         port=os.getenv("DB_PORT", "5432"),
         dbname=os.getenv("DB_NAME", "modbus_fw"),
-        user=os.getenv("DB_USER", "modbus"),
-        password=os.getenv("DB_PASSWORD", "modbuspassword"),
+        user=os.getenv("DB_USER", "admin"),
+        password=os.getenv("DB_PASSWORD", "Admin1234!"),
     )
