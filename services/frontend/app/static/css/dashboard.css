@@ -560,6 +560,10 @@ th {
     color: var(--muted);
 }
 
+.arp-section {
+    margin-bottom: 22px;
+}
+
 .badge.normal {
     background: rgba(57,164,255,0.14);
     color: #9fd2ff;
