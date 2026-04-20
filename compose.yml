@@ -52,7 +52,7 @@ services:
     environment:
       APP_ENV: development
       LOG_LEVEL: INFO
-      DB_HOST: postgres
+      DB_HOST: 127.0.0.1
       DB_PORT: 5432
       DB_NAME: modbus_fw
       DB_USER: admin
