@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 from functools import wraps
 from werkzeug.security import check_password_hash
 import os
+import requests
+
 
 
 def read_secret(secret_name: str) -> str:
@@ -46,262 +48,28 @@ def login_required(view_func):
 
 
 def get_dashboard_data():
-    combined_series = [
-        {
-            "time": "00",
-            "traffic": 18,
-            "latency": 0.5,
-            "traffic_baseline": 20,
-            "latency_baseline": 0.5,
-            "latency_threshold": 1.0,
-            "failed_requests": 0,
-            "downtime": False,
-        },
-        {
-            "time": "02",
-            "traffic": 16,
-            "latency": 0.5,
-            "traffic_baseline": 20,
-            "latency_baseline": 0.5,
-            "latency_threshold": 1.0,
-            "failed_requests": 0,
-            "downtime": False,
-        },
-        {
-            "time": "04",
-            "traffic": 15,
-            "latency": 0.4,
-            "traffic_baseline": 20,
-            "latency_baseline": 0.5,
-            "latency_threshold": 1.0,
-            "failed_requests": 0,
-            "downtime": False,
-        },
-        {
-            "time": "06",
-            "traffic": 19,
-            "latency": 0.5,
-            "traffic_baseline": 20,
-            "latency_baseline": 0.5,
-            "latency_threshold": 1.0,
-            "failed_requests": 0,
-            "downtime": False,
-        },
-        {
-            "time": "08",
-            "traffic": 42,
-            "latency": 0.7,
-            "traffic_baseline": 20,
-            "latency_baseline": 0.5,
-            "latency_threshold": 1.0,
-            "failed_requests": 1,
-            "downtime": False,
-        },
-        {
-            "time": "10",
-            "traffic": 58,
-            "latency": 1.1,
-            "traffic_baseline": 20,
-            "latency_baseline": 0.5,
-            "latency_threshold": 1.0,
-            "failed_requests": 3,
-            "downtime": True,
-        },
-        {
-            "time": "12",
-            "traffic": 51,
-            "latency": 1.4,
-            "traffic_baseline": 20,
-            "latency_baseline": 0.5,
-            "latency_threshold": 1.0,
-            "failed_requests": 5,
-            "downtime": True,
-        },
-        {
-            "time": "14",
-            "traffic": 47,
-            "latency": 1.5,
-            "traffic_baseline": 20,
-            "latency_baseline": 0.5,
-            "latency_threshold": 1.0,
-            "failed_requests": 4,
-            "downtime": True,
-        },
-        {
-            "time": "16",
-            "traffic": 53,
-            "latency": 1.3,
-            "traffic_baseline": 20,
-            "latency_baseline": 0.5,
-            "latency_threshold": 1.0,
-            "failed_requests": 3,
-            "downtime": False,
-        },
-        {
-            "time": "18",
-            "traffic": 49,
-            "latency": 1.0,
-            "traffic_baseline": 20,
-            "latency_baseline": 0.5,
-            "latency_threshold": 1.0,
-            "failed_requests": 2,
-            "downtime": False,
-        },
-        {
-            "time": "20",
-            "traffic": 28,
-            "latency": 0.8,
-            "traffic_baseline": 20,
-            "latency_baseline": 0.5,
-            "latency_threshold": 1.0,
-            "failed_requests": 1,
-            "downtime": False,
-        },
-        {
-            "time": "22",
-            "traffic": 21,
-            "latency": 0.6,
-            "traffic_baseline": 20,
-            "latency_baseline": 0.5,
-            "latency_threshold": 1.0,
-            "failed_requests": 0,
-            "downtime": False,
-        },
-    ]
+    try:
+        dashboard_resp = requests.get(f"{API_BASE_URL}/api/dashboard", timeout=5)
+        dashboard_resp.raise_for_status()
+        data = dashboard_resp.json()
 
-    chart_events = [
-        {"time": "10", "label": "Traffic spike", "severity": "warning"},
-        {"time": "12", "label": "Latency increase", "severity": "critical"},
-        {"time": "14", "label": "Link interruption", "severity": "critical"},
-    ]
+        devices_resp = requests.get(f"{API_BASE_URL}/api/devices", timeout=5)
+        devices_resp.raise_for_status()
+        devices = devices_resp.json()
 
-    return {
-        "generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
-        "sensor": {
-            "status": "Online",
-            "mode": "Inline enforcement",
-            "interface": "eth1",
-        },
-        "arp_monitor": {
-            "status": "Alert",
-            "summary": "2 suspicious ARP changes detected",
-            "gateway_ip": "10.168.40.1",
-            "gateway_expected_mac": "00:50:56:c0:00:01",
-            "gateway_seen_mac": "00:11:22:33:44:55",
-            "critical_pairs": [
-                {
-                    "label": "Gateway",
-                    "ip": "10.168.40.1",
-                    "expected_mac": "00:50:56:c0:00:01",
-                    "seen_mac": "00:11:22:33:44:55",
-                    "state": "critical"
-                },
-                {
-                    "label": "PLC-03",
-                    "ip": "10.168.40.13",
-                    "expected_mac": "00:80:f4:12:34:03",
-                    "seen_mac": "00:80:f4:12:34:03",
-                    "state": "normal"
-                },
-                {
-                    "label": "SCADA-01",
-                    "ip": "10.168.40.21",
-                    "expected_mac": "3c:52:82:aa:10:21",
-                    "seen_mac": "3c:52:82:aa:10:21",
-                    "state": "normal"
-                }
+        data["devices"] = devices
+        return data
+
+    except Exception as exc:
+        return {
+            "generated_at": "backend unavailable",
+            "summary": [
+                {"label": "Online devices", "value": 0, "note": str(exc)},
+                {"label": "Packets last 60s", "value": 0, "note": "No backend data"},
+                {"label": "ARP last 60s", "value": 0, "note": "No backend data"},
             ],
-            "events": [
-                {
-                    "time": "10:13:04",
-                    "type": "MAC changed",
-                    "details": "Gateway 10.168.40.1 changed MAC from 00:50:56:c0:00:01 to 00:11:22:33:44:55",
-                    "severity": "critical"
-                },
-                {
-                    "time": "10:13:09",
-                    "type": "ARP reply burst",
-                    "details": "8 unsolicited ARP replies observed from 10.168.40.200",
-                    "severity": "warning"
-                },
-                {
-                    "time": "10:13:15",
-                    "type": "Identity mismatch",
-                    "details": "Observed MAC for gateway does not match approved baseline",
-                    "severity": "critical"
-                }
-            ]
-        },
-        "summary": [
-            {"label": "Online devices", "value": 14, "note": "2 masters · 4 PLC/RTU · 1 HMI"},
-            {"label": "Disconnected links", "value": 2, "note": "1 master affected"},
-            {"label": "Average latency", "value": "1.5 s", "note": "was 0.5 s baseline"},
-            {"label": "Active ports", "value": "5 / 8", "note": "3 inactive on Westermo"},
-        ],
-        "combined_series": combined_series,
-        "chart_events": chart_events,
-        "combined_note": "Traffic, latency, failed requests and downtime are shown together against normal baseline.",
-        "connections": [
-            {
-                "master": "SCADA-01",
-                "slave": "PLC-01",
-                "status": "Connected",
-                "downtime": "0 min",
-                "last_change": "Stable",
-            },
-            {
-                "master": "SCADA-01",
-                "slave": "PLC-03",
-                "status": "Interrupted",
-                "downtime": "7 min",
-                "last_change": "10:14",
-            },
-            {
-                "master": "HMI-01",
-                "slave": "RTU-07",
-                "status": "Connected",
-                "downtime": "0 min",
-                "last_change": "Stable",
-            },
-            {
-                "master": "ENG-WS-02",
-                "slave": "RTU-07",
-                "status": "Unstable",
-                "downtime": "2 min",
-                "last_change": "10:12",
-            },
-        ],
-        "ports": [
-            {"port": "Port 1", "name": "SCADA-01", "state": "active", "speed": "100 Mbps", "activity": "High"},
-            {"port": "Port 2", "name": "PLC-01", "state": "active", "speed": "100 Mbps", "activity": "Medium"},
-            {"port": "Port 3", "name": "PLC-03", "state": "active", "speed": "100 Mbps", "activity": "High"},
-            {"port": "Port 4", "name": "RTU-07", "state": "active", "speed": "100 Mbps", "activity": "Medium"},
-            {"port": "Port 5", "name": "HMI-01", "state": "active", "speed": "100 Mbps", "activity": "Low"},
-            {"port": "Port 6", "name": "Unused", "state": "inactive", "speed": "-", "activity": "None"},
-            {"port": "Port 7", "name": "Unused", "state": "inactive", "speed": "-", "activity": "None"},
-            {"port": "Port 8", "name": "Service laptop", "state": "inactive", "speed": "-", "activity": "None"},
-        ],
-        "events": [
-            {
-                "time": "10:14",
-                "type": "Link interruption",
-                "details": "SCADA-01 lost communication to PLC-03",
-                "impact": "Write commands delayed",
-            },
-            {
-                "time": "10:12",
-                "type": "Latency increase",
-                "details": "Average Modbus request time increased above 1.0 s",
-                "impact": "Slower operator feedback",
-            },
-            {
-                "time": "09:58",
-                "type": "Traffic spike",
-                "details": "Traffic volume above night baseline",
-                "impact": "Needs review",
-            },
-        ],
-    }
+            "devices": [],
+        }
 
 @app.route("/login", methods=["GET", "POST"])
 def login():

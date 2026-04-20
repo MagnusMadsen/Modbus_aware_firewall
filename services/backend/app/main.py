@@ -2,6 +2,7 @@ from flask import Flask, jsonify
 from capture import start_capture
 from parser import parse_packet
 from db import get_connection
+from psycopg2.extras import RealDictCursor
 
 import threading
 import os
@@ -55,9 +56,67 @@ def start_capture_thread():
     thread = threading.Thread(target=run_capture, daemon=True)
     thread.start()
 
+
+def fetch_summary():
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    cur.execute("SELECT COUNT(*) AS count FROM devices;")
+    device_count = cur.fetchone()["count"]
+
+    cur.execute("""
+        SELECT COUNT(*) AS count
+        FROM packet_logs
+        WHERE ts >= NOW() - INTERVAL '60 seconds'
+    """)
+    recent_packets = cur.fetchone()["count"]
+
+    cur.execute("""
+        SELECT COUNT(*) AS count
+        FROM packet_logs
+        WHERE protocol = 'ARP'
+          AND ts >= NOW() - INTERVAL '60 seconds'
+    """)
+    arp_packets = cur.fetchone()["count"]
+
+    cur.close()
+    conn.close()
+
+    return {
+        "generated_at": "live",
+        "summary": [
+            {"label": "Online devices", "value": device_count, "note": "Observed in SQL"},
+            {"label": "Packets last 60s", "value": recent_packets, "note": "Live capture"},
+            {"label": "ARP last 60s", "value": arp_packets, "note": "Live capture"},
+        ]
+    }
+
+def fetch_devices():
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    cur.execute("""
+        SELECT ip, mac, first_seen, last_seen
+        FROM devices
+        ORDER BY last_seen DESC
+    """)
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+    return rows
+
 @app.route("/health")
 def health():
     return jsonify({"status": "ok", "service": "backend"})
+
+@app.route("/api/dashboard")
+def api_dashboard():
+    return jsonify(fetch_summary())
+
+@app.route("/api/devices")
+def api_devices():
+    return jsonify(fetch_devices())
 
 if __name__ == "__main__":
     start_capture_thread()
