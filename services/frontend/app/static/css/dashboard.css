@@ -461,6 +461,45 @@ th {
     border: 1px solid rgba(255,107,107,0.2);
 }
 
+.chart-grid.single-chart {
+    grid-template-columns: 1fr;
+}
+
+.chart-shell {
+    height: 340px;
+    position: relative;
+}
+
+.chart-meta {
+    margin-top: 14px;
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.legend-box,
+.legend-line {
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 8px;
+}
+
+.legend-box.traffic-box {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    background: rgba(111, 207, 255, 0.55);
+    border: 1px solid rgba(111, 207, 255, 0.95);
+}
+
+.legend-line.latency-line {
+    width: 18px;
+    height: 0;
+    border-top: 3px solid rgba(167, 139, 250, 1);
+}
+
 @media (max-width: 1400px) {
     .summary-grid {
         grid-template-columns: repeat(2, 1fr);

@@ -46,44 +46,20 @@ def login_required(view_func):
 
 
 def get_dashboard_data():
-    traffic_points = [
-        {"time": "00", "value": 18},
-        {"time": "02", "value": 16},
-        {"time": "04", "value": 15},
-        {"time": "06", "value": 19},
-        {"time": "08", "value": 42},
-        {"time": "10", "value": 58},
-        {"time": "12", "value": 51},
-        {"time": "14", "value": 47},
-        {"time": "16", "value": 53},
-        {"time": "18", "value": 49},
-        {"time": "20", "value": 28},
-        {"time": "22", "value": 21},
+    combined_series = [
+        {"time": "00", "traffic": 18, "latency": 0.5},
+        {"time": "02", "traffic": 16, "latency": 0.5},
+        {"time": "04", "traffic": 15, "latency": 0.4},
+        {"time": "06", "traffic": 19, "latency": 0.5},
+        {"time": "08", "traffic": 42, "latency": 0.7},
+        {"time": "10", "traffic": 58, "latency": 1.1},
+        {"time": "12", "traffic": 51, "latency": 1.4},
+        {"time": "14", "traffic": 47, "latency": 1.5},
+        {"time": "16", "traffic": 53, "latency": 1.3},
+        {"time": "18", "traffic": 49, "latency": 1.0},
+        {"time": "20", "traffic": 28, "latency": 0.8},
+        {"time": "22", "traffic": 21, "latency": 0.6},
     ]
-
-    latency_points = [
-        {"time": "00", "value": 0.5},
-        {"time": "02", "value": 0.5},
-        {"time": "04", "value": 0.4},
-        {"time": "06", "value": 0.5},
-        {"time": "08", "value": 0.7},
-        {"time": "10", "value": 1.1},
-        {"time": "12", "value": 1.4},
-        {"time": "14", "value": 1.5},
-        {"time": "16", "value": 1.3},
-        {"time": "18", "value": 1.0},
-        {"time": "20", "value": 0.8},
-        {"time": "22", "value": 0.6},
-    ]
-
-    max_traffic = max(point["value"] for point in traffic_points)
-    max_latency = max(point["value"] for point in latency_points)
-
-    for point in traffic_points:
-        point["height"] = max(16, int((point["value"] / max_traffic) * 180))
-
-    for point in latency_points:
-        point["height"] = max(16, int((point["value"] / max_latency) * 180))
 
     return {
         "generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
@@ -98,10 +74,8 @@ def get_dashboard_data():
             {"label": "Average latency", "value": "1.5 s", "note": "was 0.5 s baseline"},
             {"label": "Active ports", "value": "5 / 8", "note": "3 inactive on Westermo"},
         ],
-        "traffic_points": traffic_points,
-        "traffic_note": "Traffic spike detected around 10:00-18:00 compared to night baseline.",
-        "latency_points": latency_points,
-        "latency_note": "Latency increased from normal 0.5 s to peak 1.5 s during daytime activity.",
+        "combined_series": combined_series,
+        "combined_note": "Traffic increased during daytime and latency rose from 0.5 s to 1.5 s in the same period.",
         "connections": [
             {
                 "master": "SCADA-01",

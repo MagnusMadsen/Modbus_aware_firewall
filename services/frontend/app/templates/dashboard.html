@@ -60,42 +60,22 @@
                 {% endfor %}
             </section>
 
-            <section class="chart-grid">
+            <section class="chart-grid single-chart">
                 <div class="card">
                     <div class="panel-header">
                         <div>
-                            <h3>Traffic over time</h3>
-                            <p>{{ data.traffic_note }}</p>
+                            <h3>Traffic and latency over time</h3>
+                            <p>{{ data.combined_note }}</p>
                         </div>
                     </div>
 
-                    <div class="chart">
-                        {% for point in data.traffic_points %}
-                        <div class="chart-col">
-                            <div class="chart-bar traffic" style="height: {{ point.height }}px;"></div>
-                            <strong>{{ point.value }}</strong>
-                            <span>{{ point.time }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="panel-header">
-                        <div>
-                            <h3>Latency over time</h3>
-                            <p>{{ data.latency_note }}</p>
-                        </div>
+                    <div class="chart-shell">
+                        <canvas id="trafficLatencyChart"></canvas>
                     </div>
 
-                    <div class="chart">
-                        {% for point in data.latency_points %}
-                        <div class="chart-col">
-                            <div class="chart-bar latency" style="height: {{ point.height }}px;"></div>
-                            <strong>{{ point.value }} s</strong>
-                            <span>{{ point.time }}</span>
-                        </div>
-                        {% endfor %}
+                    <div class="chart-meta">
+                        <span><i class="legend-box traffic-box"></i>Traffic volume</span>
+                        <span><i class="legend-line latency-line"></i>Latency</span>
                     </div>
                 </div>
             </section>
@@ -182,5 +162,108 @@
             </section>
         </main>
     </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const combinedSeries = {{ data.combined_series | tojson }};
+
+    const labels = combinedSeries.map(item => item.time);
+    const trafficData = combinedSeries.map(item => item.traffic);
+    const latencyData = combinedSeries.map(item => item.latency);
+
+    const ctx = document.getElementById('trafficLatencyChart').getContext('2d');
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Traffic volume',
+                    data: trafficData,
+                    yAxisID: 'yTraffic',
+                    borderColor: 'rgba(111, 207, 255, 1)',
+                    backgroundColor: 'rgba(111, 207, 255, 0.18)',
+                    fill: true,
+                    tension: 0.35,
+                    pointRadius: 2,
+                    pointHoverRadius: 4
+                },
+                {
+                    label: 'Latency',
+                    data: latencyData,
+                    yAxisID: 'yLatency',
+                    borderColor: 'rgba(167, 139, 250, 1)',
+                    backgroundColor: 'rgba(167, 139, 250, 1)',
+                    fill: false,
+                    tension: 0.35,
+                    pointRadius: 2,
+                    pointHoverRadius: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(10, 17, 28, 0.95)',
+                    borderColor: 'rgba(255,255,255,0.08)',
+                    borderWidth: 1,
+                    titleColor: '#e8eef8',
+                    bodyColor: '#c8d4e3'
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        color: 'rgba(255,255,255,0.05)'
+                    },
+                    ticks: {
+                        color: '#91a5be'
+                    }
+                },
+                yTraffic: {
+                    position: 'left',
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(255,255,255,0.05)'
+                    },
+                    ticks: {
+                        color: '#91a5be'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Traffic',
+                        color: '#91a5be'
+                    }
+                },
+                yLatency: {
+                    position: 'right',
+                    beginAtZero: true,
+                    grid: {
+                        drawOnChartArea: false
+                    },
+                    ticks: {
+                        color: '#91a5be'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Latency (s)',
+                        color: '#91a5be'
+                    }
+                }
+            }
+        }
+    });
+</script>
+
 </body>
 </html>
