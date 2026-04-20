@@ -83,7 +83,7 @@ services:
       backend:
         condition: service_started
     environment:
-      API_BASE_URL: http://backend:8000
+      API_BASE_URL: http://host.docker.internal:8000
       APP_ENV: development
       TZ: Europe/Copenhagen
       APP_USERNAME: admin
