@@ -48,28 +48,57 @@ def login_required(view_func):
 
 
 def get_dashboard_data():
+    data = {
+        "generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "sensor": {
+            "status": "Online",
+            "mode": "Passive monitoring",
+            "interface": "eth0",
+        },
+        "arp_monitor": {
+            "status": "Normal",
+            "summary": "No ARP alerts yet",
+            "gateway_ip": "-",
+            "gateway_expected_mac": "-",
+            "gateway_seen_mac": "-",
+            "critical_pairs": [],
+            "events": [],
+        },
+        "summary": [
+            {"label": "Online devices", "value": 0, "note": "Observed in SQL"},
+            {"label": "Packets last 60s", "value": 0, "note": "Live capture"},
+            {"label": "ARP last 60s", "value": 0, "note": "Live capture"},
+        ],
+        "combined_series": [],
+        "chart_events": [],
+        "combined_note": "Traffic and latency data will appear here when available.",
+        "connections": [],
+        "ports": [],
+        "events": [],
+        "devices": [],
+    }
+
     try:
         dashboard_resp = requests.get(f"{API_BASE_URL}/api/dashboard", timeout=5)
         dashboard_resp.raise_for_status()
-        data = dashboard_resp.json()
+        dashboard_json = dashboard_resp.json()
 
         devices_resp = requests.get(f"{API_BASE_URL}/api/devices", timeout=5)
         devices_resp.raise_for_status()
-        devices = devices_resp.json()
+        devices_json = devices_resp.json()
 
-        data["devices"] = devices
-        return data
+        data["generated_at"] = dashboard_json.get("generated_at", data["generated_at"])
+        data["summary"] = dashboard_json.get("summary", data["summary"])
+        data["devices"] = devices_json
 
     except Exception as exc:
-        return {
-            "generated_at": "backend unavailable",
-            "summary": [
-                {"label": "Online devices", "value": 0, "note": str(exc)},
-                {"label": "Packets last 60s", "value": 0, "note": "No backend data"},
-                {"label": "ARP last 60s", "value": 0, "note": "No backend data"},
-            ],
-            "devices": [],
-        }
+        data["summary"] = [
+            {"label": "Online devices", "value": 0, "note": str(exc)},
+            {"label": "Packets last 60s", "value": 0, "note": "No backend data"},
+            {"label": "ARP last 60s", "value": 0, "note": "No backend data"},
+        ]
+
+    return data
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
