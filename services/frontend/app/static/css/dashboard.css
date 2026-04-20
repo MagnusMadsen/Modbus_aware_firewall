@@ -474,6 +474,19 @@ th {
     position: relative;
 }
 
+.chart-empty-state {
+    height: 100%;
+    min-height: 340px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 14px;
+    border: 1px dashed rgba(255,255,255,0.12);
+    border-radius: 14px;
+    background: rgba(255,255,255,0.02);
+}
+
 .chart-meta {
     margin-top: 14px;
     display: flex;
@@ -502,6 +515,48 @@ th {
     width: 18px;
     height: 0;
     border-top: 3px solid rgba(167, 139, 250, 1);
+}
+
+.legend-line.baseline-line {
+    width: 18px;
+    height: 0;
+    border-top: 3px dashed rgba(167, 139, 250, 0.85);
+}
+
+.legend-line.threshold-line {
+    width: 18px;
+    height: 0;
+    border-top: 3px dashed rgba(255, 107, 107, 0.95);
+}
+
+.legend-box.failed-box {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    background: rgba(255, 158, 66, 0.55);
+    border: 1px solid rgba(255, 158, 66, 1);
+}
+
+.legend-box.downtime-box {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    background: rgba(255, 107, 107, 0.18);
+    border: 1px solid rgba(255, 107, 107, 0.45);
+}
+
+.legend-dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    vertical-align: middle;
+    margin-right: 8px;
+    border-radius: 50%;
+}
+
+.legend-dot.event-dot {
+    background: #ffffff;
+    border: 2px solid rgba(255, 107, 107, 1);
 }
 
 .arp-grid {
