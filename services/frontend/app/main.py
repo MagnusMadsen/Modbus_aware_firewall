@@ -6,10 +6,6 @@ import os
 import requests
 
 
-PASSWORD_HASH = read_secret("frontend_password_hash")
-API_BASE_URL = os.getenv("API_BASE_URL", "http://host.docker.internal:8000")
-
-
 
 def read_secret(secret_name: str) -> str:
     path = f"/run/secrets/{secret_name}"
@@ -35,11 +31,14 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(hours=1),
 )
 
+
+
 USERNAME = os.getenv("APP_USERNAME")
 if not USERNAME:
     raise RuntimeError("APP_USERNAME is not set")
 
 PASSWORD_HASH = read_secret("frontend_password_hash")
+API_BASE_URL = os.getenv("API_BASE_URL", "http://host.docker.internal:8000")
 
 
 def login_required(view_func):
