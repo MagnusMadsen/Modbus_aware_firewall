@@ -68,6 +68,56 @@ def get_dashboard_data():
             "mode": "Inline enforcement",
             "interface": "eth1",
         },
+        "arp_monitor": {
+            "status": "Alert",
+            "summary": "2 suspicious ARP changes detected",
+            "gateway_ip": "10.168.40.1",
+            "gateway_expected_mac": "00:50:56:c0:00:01",
+            "gateway_seen_mac": "00:11:22:33:44:55",
+            "critical_pairs": [
+                {
+                    "label": "Gateway",
+                    "ip": "10.168.40.1",
+                    "expected_mac": "00:50:56:c0:00:01",
+                    "seen_mac": "00:11:22:33:44:55",
+                    "state": "critical"
+                },
+                {
+                    "label": "PLC-03",
+                    "ip": "10.168.40.13",
+                    "expected_mac": "00:80:f4:12:34:03",
+                    "seen_mac": "00:80:f4:12:34:03",
+                    "state": "normal"
+                },
+                {
+                    "label": "SCADA-01",
+                    "ip": "10.168.40.21",
+                    "expected_mac": "3c:52:82:aa:10:21",
+                    "seen_mac": "3c:52:82:aa:10:21",
+                    "state": "normal"
+                }
+            ],
+            "events": [
+                {
+                    "time": "10:13:04",
+                    "type": "MAC changed",
+                    "details": "Gateway 10.168.40.1 changed MAC from 00:50:56:c0:00:01 to 00:11:22:33:44:55",
+                    "severity": "critical"
+                },
+                {
+                    "time": "10:13:09",
+                    "type": "ARP reply burst",
+                    "details": "8 unsolicited ARP replies observed from 10.168.40.200",
+                    "severity": "warning"
+                },
+                {
+                    "time": "10:13:15",
+                    "type": "Identity mismatch",
+                    "details": "Observed MAC for gateway does not match approved baseline",
+                    "severity": "critical"
+                }
+            ]
+        },
         "summary": [
             {"label": "Online devices", "value": 14, "note": "2 masters · 4 PLC/RTU · 1 HMI"},
             {"label": "Disconnected links", "value": 2, "note": "1 master affected"},

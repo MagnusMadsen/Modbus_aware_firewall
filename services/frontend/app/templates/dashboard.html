@@ -80,6 +80,71 @@
                 </div>
             </section>
 
+            <section class="card">
+                <div class="panel-header">
+                    <div>
+                        <h3>ARP detection</h3>
+                        <p>Detect IP-to-MAC changes that can indicate ARP spoofing or MITM</p>
+                    </div>
+                    <span class="badge {{ data.arp_monitor.status|lower }}">{{ data.arp_monitor.status }}</span>
+                </div>
+
+                <div class="arp-summary">
+                    <div class="arp-summary-card">
+                        <span>Current status</span>
+                        <strong>{{ data.arp_monitor.summary }}</strong>
+                    </div>
+                    <div class="arp-summary-card">
+                        <span>Gateway expected MAC</span>
+                        <strong>{{ data.arp_monitor.gateway_expected_mac }}</strong>
+                    </div>
+                    <div class="arp-summary-card">
+                        <span>Gateway seen MAC</span>
+                        <strong class="arp-bad">{{ data.arp_monitor.gateway_seen_mac }}</strong>
+                    </div>
+                </div>
+
+                <div class="content-grid arp-grid">
+                    <div class="arp-table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Asset</th>
+                                    <th>IP</th>
+                                    <th>Expected MAC</th>
+                                    <th>Seen MAC</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in data.arp_monitor.critical_pairs %}
+                                <tr>
+                                    <td>{{ item.label }}</td>
+                                    <td>{{ item.ip }}</td>
+                                    <td>{{ item.expected_mac }}</td>
+                                    <td>{{ item.seen_mac }}</td>
+                                    <td><span class="badge {{ item.state }}">{{ item.state }}</span></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="arp-event-list">
+                        {% for event in data.arp_monitor.events %}
+                        <div class="arp-event-item">
+                            <div class="event-top">
+                                <strong>{{ event.type }}</strong>
+                                <span class="badge {{ event.severity }}">{{ event.severity }}</span>
+                            </div>
+                            <p>{{ event.details }}</p>
+                            <small>{{ event.time }}</small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </section>
+
             <section class="content-grid two-up">
                 <div class="card">
                     <div class="panel-header">
