@@ -87,6 +87,8 @@ services:
       APP_ENV: development
       TZ: Europe/Copenhagen
       APP_USERNAME: admin
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     secrets:
       - frontend_secret_key
       - frontend_password_hash
