@@ -3,13 +3,17 @@ from capture import start_capture
 from parser import parse_packet
 from db import get_connection
 from psycopg2.extras import RealDictCursor
+from api import api_bp
 
 import threading
 import os
 
+
+
 CAPTURE_INTERFACE = os.getenv("CAPTURE_INTERFACE", "eth0")
 
 app = Flask(__name__)
+app.register_blueprint(api_bp)
 
 def save_packet(data):
     print("PACKET:", data, flush=True)
@@ -151,9 +155,6 @@ def fetch_devices():
     conn.close()
     return rows
 
-@app.route("/health")
-def health():
-    return jsonify({"status": "ok", "service": "backend"})
 
 @app.route("/api/dashboard")
 def api_dashboard():
