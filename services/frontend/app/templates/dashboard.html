@@ -154,38 +154,48 @@
                 <div class="card">
                     <div class="panel-header">
                         <div>
-                            <h3>Observed connections</h3>
-                            <p>Live TCP and IP relationships seen by the sensor</p>
+                            <h3>Master / slave connections</h3>
+                            <p>Grouped by master with connected slaves</p>
                         </div>
                     </div>
 
-                    <div class="table-wrap">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Source IP</th>
-                                    <th>Destination IP</th>
-                                    <th>Protocol</th>
-                                    <th>Source port</th>
-                                    <th>Destination port</th>
-                                    <th>Packets</th>
-                                    <th>Last seen</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for row in data.connections %}
-                                <tr>
-                                    <td>{{ row.src_ip }}</td>
-                                    <td>{{ row.dst_ip }}</td>
-                                    <td>{{ row.protocol }}</td>
-                                    <td>{{ row.src_port or '-' }}</td>
-                                    <td>{{ row.dst_port or '-' }}</td>
-                                    <td>{{ row.packet_count }}</td>
-                                    <td>{{ row.last_seen }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <div class="connection-groups">
+                        {% for group in data.connections %}
+                        <div class="connection-group-card">
+                            <div class="connection-group-head">
+                                <div>
+                                    <h4>Master {{ group.master }}</h4>
+                                    <p>{{ group.slave_count }} slaves connected</p>
+                                </div>
+                                <div class="connection-group-meta">
+                                    <span>Last seen: {{ group.last_seen }}</span>
+                                </div>
+                            </div>
+
+                            <div class="table-wrap">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Slave</th>
+                                            <th>Status</th>
+                                            <th>Packets</th>
+                                            <th>Last seen</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for slave in group.slaves %}
+                                        <tr>
+                                            <td>{{ slave.ip }}</td>
+                                            <td><span class="badge {{ slave.status }}">{{ slave.status }}</span></td>
+                                            <td>{{ slave.packets }}</td>
+                                            <td>{{ slave.last_seen }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% endfor %}
                     </div>
                 </div>
 

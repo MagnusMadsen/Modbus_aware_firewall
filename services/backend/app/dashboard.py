@@ -66,7 +66,7 @@ def fetch_summary():
     recent_packets = get_recent_packet_count(cur)
     arp_packets = get_recent_arp_count(cur)
     traffic_rows = get_traffic_rows(cur)
-    connections = get_observed_connections(cur)
+    connections = get_master_slave_groups(cur)
     device_roles = get_device_roles(cur)
 
     cur.close()
@@ -163,3 +163,94 @@ def get_observed_connections(cur):
     """)
     return cur.fetchall()
 
+
+def get_master_slave_groups(cur):
+    cur.execute("""
+        WITH peer_stats AS (
+            SELECT
+                ip,
+                COUNT(DISTINCT peer_ip) AS peer_count
+            FROM (
+                SELECT src_ip AS ip, dst_ip AS peer_ip
+                FROM observed_connections
+                WHERE src_ip IS NOT NULL AND dst_ip IS NOT NULL
+
+                UNION
+
+                SELECT dst_ip AS ip, src_ip AS peer_ip
+                FROM observed_connections
+                WHERE src_ip IS NOT NULL AND dst_ip IS NOT NULL
+            ) peers
+            GROUP BY ip
+        ),
+        relation_stats AS (
+            SELECT
+                a.ip AS ip_a,
+                b.ip AS ip_b,
+                a.peer_count AS peer_count_a,
+                b.peer_count AS peer_count_b
+            FROM peer_stats a
+            JOIN peer_stats b ON a.ip < b.ip
+        ),
+        directed_relations AS (
+            SELECT
+                CASE
+                    WHEN peer_count_a > peer_count_b THEN ip_a
+                    WHEN peer_count_b > peer_count_a THEN ip_b
+                    ELSE LEAST(ip_a, ip_b)
+                END AS master_ip,
+                CASE
+                    WHEN peer_count_a > peer_count_b THEN ip_b
+                    WHEN peer_count_b > peer_count_a THEN ip_a
+                    ELSE GREATEST(ip_a, ip_b)
+                END AS slave_ip
+            FROM relation_stats
+        ),
+        aggregated_relations AS (
+            SELECT
+                dr.master_ip,
+                dr.slave_ip,
+                SUM(oc.packet_count) AS packets,
+                MAX(oc.last_seen) AS last_seen
+            FROM directed_relations dr
+            JOIN observed_connections oc
+              ON (
+                   (oc.src_ip = dr.master_ip AND oc.dst_ip = dr.slave_ip)
+                OR (oc.src_ip = dr.slave_ip AND oc.dst_ip = dr.master_ip)
+              )
+            GROUP BY dr.master_ip, dr.slave_ip
+        )
+        SELECT
+            master_ip,
+            slave_ip,
+            packets,
+            last_seen
+        FROM aggregated_relations
+        ORDER BY master_ip, slave_ip
+    """)
+    rows = cur.fetchall()
+
+    groups = {}
+    for row in rows:
+        master = row["master_ip"]
+        if master not in groups:
+            groups[master] = {
+                "master": master,
+                "slave_count": 0,
+                "last_seen": row["last_seen"],
+                "slaves": [],
+            }
+
+        groups[master]["slaves"].append({
+            "ip": row["slave_ip"],
+            "status": "online",
+            "packets": row["packets"],
+            "last_seen": row["last_seen"],
+        })
+
+        groups[master]["slave_count"] += 1
+
+        if row["last_seen"] and row["last_seen"] > groups[master]["last_seen"]:
+            groups[master]["last_seen"] = row["last_seen"]
+
+    return list(groups.values())
