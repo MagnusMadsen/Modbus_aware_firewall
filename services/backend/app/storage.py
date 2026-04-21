@@ -34,6 +34,29 @@ def upsert_device(cur, data):
         (data["src_ip"], data["src_mac"]),
     )
 
+def upsert_observed_connection(cur, data):
+    if not data["src_ip"] or not data["dst_ip"] or not data["protocol"]:
+        return
+
+    cur.execute(
+        """
+        INSERT INTO observed_connections
+            (src_ip, dst_ip, protocol, src_port, dst_port, first_seen, last_seen, packet_count)
+        VALUES
+            (%s, %s, %s, %s, %s, NOW(), NOW(), 1)
+        ON CONFLICT (src_ip, dst_ip, protocol, src_port, dst_port)
+        DO UPDATE SET
+            last_seen = NOW(),
+            packet_count = observed_connections.packet_count + 1
+        """,
+        (
+            data["src_ip"],
+            data["dst_ip"],
+            data["protocol"],
+            data["src_port"],
+            data["dst_port"],
+        ),
+    )
 
 def save_packet(data):
     print("PACKET:", data, flush=True)
@@ -43,7 +66,10 @@ def save_packet(data):
 
     insert_packet_log(cur, data)
     upsert_device(cur, data)
+    upsert_observed_connection(cur, data)
 
     conn.commit()
     cur.close()
     conn.close()
+
+    

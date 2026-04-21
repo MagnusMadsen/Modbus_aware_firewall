@@ -66,6 +66,7 @@ def fetch_summary():
     recent_packets = get_recent_packet_count(cur)
     arp_packets = get_recent_arp_count(cur)
     traffic_rows = get_traffic_rows(cur)
+    connections = get_observed_connections(cur)
 
     cur.close()
     conn.close()
@@ -96,7 +97,7 @@ def fetch_summary():
             "critical_pairs": [],
             "events": [],
         },
-        "connections": [],
+        "connections": connections,
         "ports": [],
         "events": [],
     }
@@ -117,4 +118,21 @@ def fetch_devices():
 
     return rows
 
+
+def get_observed_connections(cur):
+    cur.execute("""
+        SELECT
+            src_ip,
+            dst_ip,
+            protocol,
+            src_port,
+            dst_port,
+            first_seen,
+            last_seen,
+            packet_count
+        FROM observed_connections
+        ORDER BY last_seen DESC
+        LIMIT 20
+    """)
+    return cur.fetchall()
 
