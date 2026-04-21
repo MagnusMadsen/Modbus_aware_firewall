@@ -1,12 +1,7 @@
 from db import get_connection
 
 
-def save_packet(data):
-    print("PACKET:", data, flush=True)
-
-    conn = get_connection()
-    cur = conn.cursor()
-
+def insert_packet_log(cur, data):
     cur.execute(
         """
         INSERT INTO packet_logs (src_mac, dst_mac, src_ip, dst_ip, protocol, src_port, dst_port, length)
@@ -24,16 +19,30 @@ def save_packet(data):
         ),
     )
 
-    if data["src_mac"] and data["src_ip"] and data["src_ip"] != "0.0.0.0":
-        cur.execute(
-            """
-            INSERT INTO devices (ip, mac, first_seen, last_seen)
-            VALUES (%s, %s, NOW(), NOW())
-            ON CONFLICT (ip, mac)
-            DO UPDATE SET last_seen = NOW()
-            """,
-            (data["src_ip"], data["src_mac"]),
-        )
+
+def upsert_device(cur, data):
+    if not data["src_mac"] or not data["src_ip"] or data["src_ip"] == "0.0.0.0":
+        return
+
+    cur.execute(
+        """
+        INSERT INTO devices (ip, mac, first_seen, last_seen)
+        VALUES (%s, %s, NOW(), NOW())
+        ON CONFLICT (ip, mac)
+        DO UPDATE SET last_seen = NOW()
+        """,
+        (data["src_ip"], data["src_mac"]),
+    )
+
+
+def save_packet(data):
+    print("PACKET:", data, flush=True)
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    insert_packet_log(cur, data)
+    upsert_device(cur, data)
 
     conn.commit()
     cur.close()
