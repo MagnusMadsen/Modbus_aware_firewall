@@ -101,3 +101,20 @@ def fetch_summary():
         "events": [],
     }
 
+def fetch_devices():
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    cur.execute("""
+        SELECT ip, mac, first_seen, last_seen
+        FROM devices
+        ORDER BY last_seen DESC
+    """)
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return rows
+
+
