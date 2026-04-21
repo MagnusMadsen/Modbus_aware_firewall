@@ -211,35 +211,7 @@
                     </div>
                 </div>
             </section>
-            <section class="card">
-                <div class="panel-header">
-                    <div>
-                        <h3>Peer-count roles</h3>
-                        <p>Initial role estimate based on number of observed peers</p>
-                    </div>
-                </div>
-
-                <div class="table-wrap">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>IP</th>
-                                <th>Peer count</th>
-                                <th>Role</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for row in data.device_roles %}
-                            <tr>
-                                <td>{{ row.ip }}</td>
-                                <td>{{ row.peer_count }}</td>
-                                <td><span class="badge {{ row.role }}">{{ row.role }}</span></td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </section>
+            
             <section class="card">
                 <div class="panel-header">
                     <div>
