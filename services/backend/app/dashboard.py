@@ -67,6 +67,7 @@ def fetch_summary():
     arp_packets = get_recent_arp_count(cur)
     traffic_rows = get_traffic_rows(cur)
     connections = get_observed_connections(cur)
+    device_roles = get_device_roles(cur)
 
     cur.close()
     conn.close()
@@ -98,6 +99,7 @@ def fetch_summary():
             "events": [],
         },
         "connections": connections,
+        "device_roles": device_roles,
         "ports": [],
         "events": [],
     }
@@ -118,6 +120,31 @@ def fetch_devices():
 
     return rows
 
+def get_device_roles(cur):
+    cur.execute("""
+        SELECT
+            ip,
+            COUNT(DISTINCT peer_ip) AS peer_count,
+            CASE
+                WHEN COUNT(DISTINCT peer_ip) = 0 THEN 'unknown'
+                WHEN COUNT(DISTINCT peer_ip) = 1 THEN 'slave'
+                ELSE 'master'
+            END AS role
+        FROM (
+            SELECT src_ip AS ip, dst_ip AS peer_ip
+            FROM observed_connections
+            WHERE src_ip IS NOT NULL AND dst_ip IS NOT NULL
+
+            UNION
+
+            SELECT dst_ip AS ip, src_ip AS peer_ip
+            FROM observed_connections
+            WHERE src_ip IS NOT NULL AND dst_ip IS NOT NULL
+        ) peers
+        GROUP BY ip
+        ORDER BY peer_count DESC, ip
+    """)
+    return cur.fetchall()
 
 def get_observed_connections(cur):
     cur.execute("""
