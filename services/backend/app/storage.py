@@ -35,7 +35,19 @@ def upsert_device(cur, data):
     )
 
 def upsert_observed_connection(cur, data):
-    if not data["src_ip"] or not data["dst_ip"] or not data["protocol"]:
+    if data["protocol"] != "TCP":
+        return
+
+    if data["src_port"] != 502 and data["dst_port"] != 502:
+        return
+
+    if not data["src_ip"] or not data["dst_ip"]:
+        return
+
+    if data["src_ip"] in ("0.0.0.0", "255.255.255.255"):
+        return
+
+    if data["dst_ip"] in ("0.0.0.0", "255.255.255.255"):
         return
 
     cur.execute(
@@ -72,4 +84,3 @@ def save_packet(data):
     cur.close()
     conn.close()
 
-    
