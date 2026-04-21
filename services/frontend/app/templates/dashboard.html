@@ -154,8 +154,8 @@
                 <div class="card">
                     <div class="panel-header">
                         <div>
-                            <h3>Master / slave connections</h3>
-                            <p>See whether communication is stable or interrupted</p>
+                            <h3>Observed connections</h3>
+                            <p>Live TCP and IP relationships seen by the sensor</p>
                         </div>
                     </div>
 
@@ -163,21 +163,25 @@
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Master</th>
-                                    <th>Slave</th>
-                                    <th>Status</th>
-                                    <th>Downtime</th>
-                                    <th>Last change</th>
+                                    <th>Source IP</th>
+                                    <th>Destination IP</th>
+                                    <th>Protocol</th>
+                                    <th>Source port</th>
+                                    <th>Destination port</th>
+                                    <th>Packets</th>
+                                    <th>Last seen</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for row in data.connections %}
                                 <tr>
-                                    <td>{{ row.master }}</td>
-                                    <td>{{ row.slave }}</td>
-                                    <td><span class="badge {{ row.status|lower }}">{{ row.status }}</span></td>
-                                    <td>{{ row.downtime }}</td>
-                                    <td>{{ row.last_change }}</td>
+                                    <td>{{ row.src_ip }}</td>
+                                    <td>{{ row.dst_ip }}</td>
+                                    <td>{{ row.protocol }}</td>
+                                    <td>{{ row.src_port or '-' }}</td>
+                                    <td>{{ row.dst_port or '-' }}</td>
+                                    <td>{{ row.packet_count }}</td>
+                                    <td>{{ row.last_seen }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
