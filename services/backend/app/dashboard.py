@@ -4,28 +4,32 @@ from psycopg2.extras import RealDictCursor
 
 CAPTURE_INTERFACE = os.getenv("CAPTURE_INTERFACE", "eth0")
 
-def fetch_summary():
-    conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
 
+def get_device_count(cur):
     cur.execute("SELECT COUNT(*) AS count FROM devices;")
-    device_count = cur.fetchone()["count"]
+    return cur.fetchone()["count"]
 
+
+def get_recent_packet_count(cur):
     cur.execute("""
         SELECT COUNT(*) AS count
         FROM packet_logs
         WHERE ts >= NOW() - INTERVAL '60 seconds'
     """)
-    recent_packets = cur.fetchone()["count"]
+    return cur.fetchone()["count"]
 
+
+def get_recent_arp_count(cur):
     cur.execute("""
         SELECT COUNT(*) AS count
         FROM packet_logs
         WHERE protocol = 'ARP'
           AND ts >= NOW() - INTERVAL '60 seconds'
     """)
-    arp_packets = cur.fetchone()["count"]
+    return cur.fetchone()["count"]
 
+
+def get_traffic_rows(cur):
     cur.execute("""
         SELECT
             TO_CHAR(date_trunc('minute', ts), 'HH24:MI') AS time,
@@ -35,12 +39,11 @@ def fetch_summary():
         GROUP BY date_trunc('minute', ts)
         ORDER BY date_trunc('minute', ts)
     """)
-    traffic_rows = cur.fetchall()
+    return cur.fetchall()
 
-    cur.close()
-    conn.close()
 
-    combined_series = [
+def build_combined_series(traffic_rows):
+    return [
         {
             "time": row["time"],
             "traffic": row["traffic"],
@@ -53,6 +56,21 @@ def fetch_summary():
         }
         for row in traffic_rows
     ]
+
+
+def fetch_summary():
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    device_count = get_device_count(cur)
+    recent_packets = get_recent_packet_count(cur)
+    arp_packets = get_recent_arp_count(cur)
+    traffic_rows = get_traffic_rows(cur)
+
+    cur.close()
+    conn.close()
+
+    combined_series = build_combined_series(traffic_rows)
 
     return {
         "generated_at": "live",
@@ -82,19 +100,4 @@ def fetch_summary():
         "ports": [],
         "events": [],
     }
-
-def fetch_devices():
-    conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-
-    cur.execute("""
-        SELECT ip, mac, first_seen, last_seen
-        FROM devices
-        ORDER BY last_seen DESC
-    """)
-    rows = cur.fetchall()
-
-    cur.close()
-    conn.close()
-    return rows
 
