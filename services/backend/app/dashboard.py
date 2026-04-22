@@ -130,7 +130,9 @@ def get_recent_events(cur):
             new_value,
             details
         FROM events
-        ORDER BY ts DESC
+        ORDER BY
+            COALESCE((details->>'is_pinned')::boolean, FALSE) DESC,
+            ts DESC
         LIMIT 20
         """
     )
@@ -149,6 +151,10 @@ def get_recent_events(cur):
         if row["old_value"] is not None or row["new_value"] is not None:
             parts.append(f"{row['old_value']} -> {row['new_value']}")
 
+        is_pinned = bool((row["details"] or {}).get("is_pinned", False))
+        pin_reason = (row["details"] or {}).get("pin_reason")
+        critical_label = (row["details"] or {}).get("critical_label")
+
         details = row["details"] or {}
         message = details.get("message", row["event_type"])
 
@@ -158,6 +164,9 @@ def get_recent_events(cur):
                 "time": row["time"],
                 "details": " | ".join(parts) if parts else message,
                 "impact": message,
+                "is_pinned": is_pinned,
+                "pin_reason": pin_reason,
+                "critical_label": critical_label,
             }
         )
 
