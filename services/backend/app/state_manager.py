@@ -1,8 +1,7 @@
 import os
 import threading
 import time
-from datetime import datetime, timedelta
-
+from datetime import datetime
 
 from storage import get_writer
 
@@ -14,14 +13,13 @@ DEVICE_SQL_TOUCH_SECONDS = int(os.getenv("DEVICE_SQL_TOUCH_SECONDS", "30"))
 CONNECTION_SQL_TOUCH_SECONDS = int(os.getenv("CONNECTION_SQL_TOUCH_SECONDS", "30"))
 
 
-def _utcnow():
-    return datetime.utcnow()
+def _now():
+    return datetime.now()
 
 
 def _floor_bucket(dt: datetime, seconds: int):
-    epoch = int(dt.timestamp())
-    floored = epoch - (epoch % seconds)
-    return datetime.utcfromtimestamp(floored)
+    floored_second = dt.second - (dt.second % seconds)
+    return dt.replace(second=floored_second, microsecond=0)
 
 
 def _compute_p95(values):
@@ -36,8 +34,8 @@ class ModbusStateManager:
     def __init__(self):
         self.writer = get_writer()
         self.lock = threading.Lock()
-        self.started_at = _utcnow()
-        self.bucket_ts = _floor_bucket(_utcnow(), FLUSH_INTERVAL_SECONDS)
+        self.started_at = _now()
+        self.bucket_ts = _floor_bucket(_now(), FLUSH_INTERVAL_SECONDS)
 
         self.known_devices = {}
         self.device_last_sql_touch = {}
@@ -64,7 +62,7 @@ class ModbusStateManager:
         }
 
     def in_learning_mode(self):
-        return (_utcnow() - self.started_at).total_seconds() < LEARNING_WINDOW_SECONDS
+        return (_now() - self.started_at).total_seconds() < LEARNING_WINDOW_SECONDS
 
     def start(self):
         if self._maintenance_thread is not None:
@@ -101,7 +99,7 @@ class ModbusStateManager:
                 self._flush_metrics_if_due()
 
     def _flush_metrics_if_due(self):
-        now = _utcnow()
+        now = _now()
         current_bucket = _floor_bucket(now, FLUSH_INTERVAL_SECONDS)
 
         if current_bucket <= self.bucket_ts:
@@ -135,7 +133,7 @@ class ModbusStateManager:
         if not ip or ip in ("0.0.0.0", "255.255.255.255"):
             return
 
-        now = _utcnow()
+        now = _now()
         existing = self.known_devices.get(ip)
 
         if existing is None:
@@ -184,7 +182,7 @@ class ModbusStateManager:
         if not master_ip or not slave_ip:
             return
 
-        now = _utcnow()
+        now = _now()
         key = (master_ip, slave_ip, unit_id)
         is_new = key not in self.known_connections
 
@@ -245,7 +243,7 @@ class ModbusStateManager:
 
         pending_key = (master_ip, slave_ip, data.get("transaction_id"), unit_id)
         self.pending_requests[pending_key] = {
-            "ts": _utcnow(),
+            "ts": _now(),
             "function_code": function_code,
             "register_type": data.get("register_type"),
             "register_address": data.get("register_address"),
@@ -319,7 +317,7 @@ class ModbusStateManager:
         if pending is None:
             return
 
-        latency_ms = round((_utcnow() - pending["ts"]).total_seconds() * 1000.0, 2)
+        latency_ms = round((_now() - pending["ts"]).total_seconds() * 1000.0, 2)
         self.metrics["latencies_ms"].append(latency_ms)
 
         if latency_ms >= LATENCY_SPIKE_MS and not self.in_learning_mode():
@@ -348,7 +346,7 @@ class ModbusStateManager:
             )
 
     def _expire_requests_if_needed(self):
-        now = _utcnow()
+        now = _now()
         expired_keys = []
 
         for key, pending in self.pending_requests.items():
