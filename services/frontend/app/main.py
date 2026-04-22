@@ -1,10 +1,9 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from datetime import datetime, timedelta
 from functools import wraps
 from werkzeug.security import check_password_hash
 import os
 import requests
-
 
 
 def read_secret(secret_name: str) -> str:
@@ -30,8 +29,6 @@ app.config.update(
     SESSION_COOKIE_SECURE=False,
     PERMANENT_SESSION_LIFETIME=timedelta(hours=1),
 )
-
-
 
 USERNAME = os.getenv("APP_USERNAME")
 if not USERNAME:
@@ -111,6 +108,7 @@ def get_dashboard_data():
 
     return data
 
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if session.get("authenticated"):
@@ -146,6 +144,12 @@ def index():
         data=get_dashboard_data(),
         username=session.get("username")
     )
+
+
+@app.route("/api/live-dashboard")
+@login_required
+def live_dashboard():
+    return jsonify(get_dashboard_data())
 
 
 if __name__ == "__main__":

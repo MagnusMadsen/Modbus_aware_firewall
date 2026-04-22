@@ -197,7 +197,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     const initialData = {{ data | tojson }};
-    const DASHBOARD_API_URL = "http://host.docker.internal:8000/api/dashboard";
+    const DASHBOARD_API_URL = "/api/live-dashboard";
     const POLL_INTERVAL_MS = 5000;
     const LIVE_WINDOW_POINTS = 12;
     const AUTO_RETURN_TO_LIVE_MS = 60000;
