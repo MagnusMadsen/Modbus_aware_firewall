@@ -99,6 +99,29 @@ def init_db():
         """
     )
 
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS critical_registers (
+            id SERIAL PRIMARY KEY,
+            slave_ip INET NOT NULL,
+            unit_id INTEGER NOT NULL,
+            register_type TEXT NOT NULL,
+            register_address INTEGER NOT NULL,
+            label TEXT,
+            allowed_values JSONB,
+            pin_on_change BOOLEAN NOT NULL DEFAULT TRUE,
+            is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            UNIQUE (slave_ip, unit_id, register_type, register_address)
+        );
+        """
+    )
+
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_critical_registers_lookup "
+        "ON critical_registers (slave_ip, unit_id, register_type, register_address);"
+    )
+
     cur.execute("CREATE INDEX IF NOT EXISTS idx_devices_last_seen ON devices (last_seen DESC);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_connections_last_seen ON observed_connections (last_seen DESC);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_register_state_slave ON modbus_register_state (slave_ip, unit_id);")
