@@ -284,6 +284,9 @@ th {
 .event-list {
     display: grid;
     gap: 12px;
+    max-height: 520px;
+    overflow-y: auto;
+    padding-right: 6px;
 }
 
 .event-item {
@@ -632,6 +635,9 @@ th {
 .connection-groups {
     display: grid;
     gap: 16px;
+    max-height: 520px;
+    overflow-y: auto;
+    padding-right: 6px;
 }
 
 .connection-group-card {
@@ -658,6 +664,31 @@ th {
     margin: 0;
     color: #9fb0c3;
     font-size: 14px;
+}
+
+.event-list::-webkit-scrollbar,
+.connection-groups::-webkit-scrollbar {
+    width: 10px;
+}
+
+.event-list::-webkit-scrollbar-track,
+.connection-groups::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.03);
+    border-radius: 999px;
+}
+
+.event-list::-webkit-scrollbar-thumb,
+.connection-groups::-webkit-scrollbar-thumb {
+    background: rgba(145,165,190,0.35);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+.event-list::-webkit-scrollbar-thumb:hover,
+.connection-groups::-webkit-scrollbar-thumb:hover {
+    background: rgba(145,165,190,0.55);
+    background-clip: padding-box;
 }
 
 @media (max-width: 1100px) {
