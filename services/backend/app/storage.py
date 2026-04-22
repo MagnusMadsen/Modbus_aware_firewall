@@ -175,3 +175,23 @@ def get_writer():
         if _writer is None:
             _writer = StorageWriter()
         return _writer
+    
+
+def list_critical_registers():
+    return get_writer().list_critical_registers()
+
+def save_critical_register(payload):
+    return get_writer().save_critical_register(
+        slave_ip=payload["slave_ip"],
+        unit_id=payload["unit_id"],
+        register_type=payload["register_type"],
+        register_address=payload["register_address"],
+        label=payload.get("label"),
+        allowed_values=payload.get("allowed_values"),
+        pin_on_change=payload.get("pin_on_change", True),
+        is_enabled=payload.get("is_enabled", True),
+    )
+
+def delete_critical_register(register_id):
+    return get_writer().delete_critical_register(register_id)
+
