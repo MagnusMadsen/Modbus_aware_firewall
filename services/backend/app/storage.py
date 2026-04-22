@@ -1,7 +1,7 @@
 import threading
 from datetime import datetime
 
-from psycopg2.extras import Json
+from psycopg2.extras import Json, RealDictCursor
 
 from db import get_connection
 
@@ -29,6 +29,15 @@ class StorageWriter:
                 if self._conn:
                     self._conn.rollback()
                 raise
+
+    def _query_all_dicts(self, query, params=None):
+        with self._lock:
+            self._ensure_connection()
+            cur = self._conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute(query, params or ())
+            rows = cur.fetchall()
+            cur.close()
+            return rows
 
     def upsert_device(self, ip, mac=None, role=None):
         if not ip or ip in ("0.0.0.0", "255.255.255.255"):
@@ -164,6 +173,92 @@ class StorageWriter:
             ),
         )
 
+    def get_critical_register(self, slave_ip, unit_id, register_type, register_address):
+        return self._execute(
+            """
+            SELECT
+                id,
+                slave_ip::text AS slave_ip,
+                unit_id,
+                register_type,
+                register_address,
+                label,
+                allowed_values,
+                pin_on_change,
+                is_enabled
+            FROM critical_registers
+            WHERE slave_ip = %s
+              AND unit_id = %s
+              AND register_type = %s
+              AND register_address = %s
+              AND is_enabled = TRUE
+            LIMIT 1
+            """,
+            (slave_ip, unit_id, register_type, register_address),
+            fetchone=True,
+        )
+
+    def list_critical_registers(self):
+        return self._query_all_dicts(
+            """
+            SELECT
+                id,
+                slave_ip::text AS slave_ip,
+                unit_id,
+                register_type,
+                register_address,
+                label,
+                allowed_values,
+                pin_on_change,
+                is_enabled,
+                TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') AS created_at
+            FROM critical_registers
+            ORDER BY slave_ip, unit_id, register_type, register_address
+            """
+        )
+
+    def save_critical_register(
+        self,
+        slave_ip,
+        unit_id,
+        register_type,
+        register_address,
+        label=None,
+        allowed_values=None,
+        pin_on_change=True,
+        is_enabled=True,
+    ):
+        self._execute(
+            """
+            INSERT INTO critical_registers
+                (slave_ip, unit_id, register_type, register_address, label, allowed_values, pin_on_change, is_enabled)
+            VALUES
+                (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (slave_ip, unit_id, register_type, register_address)
+            DO UPDATE SET
+                label = EXCLUDED.label,
+                allowed_values = EXCLUDED.allowed_values,
+                pin_on_change = EXCLUDED.pin_on_change,
+                is_enabled = EXCLUDED.is_enabled
+            """,
+            (
+                slave_ip,
+                unit_id,
+                register_type,
+                register_address,
+                label,
+                Json(allowed_values) if allowed_values is not None else None,
+                pin_on_change,
+                is_enabled,
+            ),
+        )
+
+    def delete_critical_register(self, register_id):
+        self._execute(
+            "DELETE FROM critical_registers WHERE id = %s",
+            (register_id,),
+        )
+
 
 _writer = None
 _writer_lock = threading.Lock()
@@ -175,10 +270,11 @@ def get_writer():
         if _writer is None:
             _writer = StorageWriter()
         return _writer
-    
+
 
 def list_critical_registers():
     return get_writer().list_critical_registers()
+
 
 def save_critical_register(payload):
     return get_writer().save_critical_register(
@@ -192,6 +288,6 @@ def save_critical_register(payload):
         is_enabled=payload.get("is_enabled", True),
     )
 
+
 def delete_critical_register(register_id):
     return get_writer().delete_critical_register(register_id)
-

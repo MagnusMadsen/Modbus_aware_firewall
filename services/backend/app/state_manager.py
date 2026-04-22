@@ -384,7 +384,12 @@ class ModbusStateManager:
                 unit_id=unit_id,
                 function_code=data.get("function_code"),
                 new_value=latency_ms,
-                details={"message": "High latency detected", "latency_ms": latency_ms},
+                details={
+                    "message": "High latency detected",
+                    "latency_ms": latency_ms,
+                    "is_pinned": True,
+                    "pin_reason": "Latency spike",
+                },
             )
 
         if data.get("is_exception"):
@@ -397,7 +402,12 @@ class ModbusStateManager:
                 unit_id=unit_id,
                 function_code=data.get("function_code"),
                 new_value=data.get("exception_code"),
-                details={"message": "Modbus exception response", "exception_code": data.get("exception_code")},
+                details={
+                    "message": "Modbus exception response",
+                    "exception_code": data.get("exception_code"),
+                    "is_pinned": True,
+                    "pin_reason": "Modbus exception response",
+                },
             )
 
     def _expire_requests_if_needed(self):
