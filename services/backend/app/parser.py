@@ -117,6 +117,14 @@ def _decode_response_fields(function_code: int, pdu: bytes):
         decoded["exception_code"] = pdu[0] if pdu else None
         return decoded
 
+    if function_code in (1, 2) and len(pdu) >= 1:
+        byte_count = pdu[0]
+        coil_bytes = pdu[1:1 + byte_count]
+        decoded["register_type"] = "coil"
+        decoded["register_count"] = byte_count * 8
+        decoded["values"] = _decode_coils(coil_bytes, byte_count * 8)
+        return decoded
+
     if function_code in (3, 4) and len(pdu) >= 1:
         byte_count = pdu[0]
         value_bytes = pdu[1:1 + byte_count]
@@ -153,6 +161,36 @@ def _decode_response_fields(function_code: int, pdu: bytes):
         return decoded
 
     return decoded
+
+
+def _infer_direction(src_port, dst_port, function_code, pdu):
+    if dst_port == 502 and src_port != 502:
+        return "request"
+
+    if src_port == 502 and dst_port != 502:
+        return "response"
+
+    if function_code & 0x80:
+        return "response"
+
+    if function_code in (1, 2, 3, 4):
+        if len(pdu) >= 1 and len(pdu) == 1 + pdu[0]:
+            return "response"
+        if len(pdu) >= 4:
+            return "request"
+
+    if function_code in (15, 16):
+        if len(pdu) == 4:
+            return "response"
+        if len(pdu) >= 5:
+            byte_count = pdu[4]
+            if len(pdu) == 5 + byte_count:
+                return "request"
+
+    if function_code in (5, 6):
+        return "request"
+
+    return "request"
 
 
 def parse_packet(pkt):
@@ -216,30 +254,37 @@ def parse_packet(pkt):
     if mbap is None:
         return data
 
-    function_code = mbap["function_code"]
+    raw_function_code = mbap["function_code"]
+    base_function_code = raw_function_code & 0x7F
     pdu = mbap["pdu"]
 
     data["is_modbus"] = True
     data["protocol"] = "MODBUS"
     data["transaction_id"] = mbap["transaction_id"]
     data["unit_id"] = mbap["unit_id"]
-    data["function_code"] = function_code & 0x7F
-    data["direction"] = "request" if data["dst_port"] == 502 else "response"
+    data["function_code"] = base_function_code
+    data["direction"] = _infer_direction(
+        data["src_port"],
+        data["dst_port"],
+        raw_function_code,
+        pdu,
+    )
 
-    if function_code & 0x80:
-        response_fields = _decode_response_fields(function_code, pdu)
+    if raw_function_code & 0x80:
+        response_fields = _decode_response_fields(raw_function_code, pdu)
         data["is_exception"] = response_fields["is_exception"]
         data["exception_code"] = response_fields["exception_code"]
+        data["direction"] = "response"
         return data
 
     if data["direction"] == "request":
-        request_fields = _decode_request_fields(function_code, pdu)
+        request_fields = _decode_request_fields(base_function_code, pdu)
         data["register_type"] = request_fields["register_type"]
         data["register_address"] = request_fields["register_address"]
         data["register_count"] = request_fields["register_count"]
         data["values"] = request_fields["values"]
     else:
-        response_fields = _decode_response_fields(function_code, pdu)
+        response_fields = _decode_response_fields(base_function_code, pdu)
         data["register_type"] = response_fields["register_type"]
         data["register_address"] = response_fields["register_address"]
         data["register_count"] = response_fields["register_count"]
