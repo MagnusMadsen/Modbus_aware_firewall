@@ -182,10 +182,18 @@
     const DASHBOARD_API_URL = "/api/live-dashboard";
     const POLL_INTERVAL_MS = 5000;
     const LIVE_WINDOW_POINTS = 60;
+    const MIN_WINDOW_POINTS = 12;
 
     let dashboardData = initialData;
     let chartInstance = null;
-    let currentWindowPoints = LIVE_WINDOW_POINTS;
+
+    let viewStartIndex = 0;
+    let viewEndIndex = 0;
+
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartStartIndex = 0;
+    let dragStartEndIndex = 0;
 
     const chartShell = document.querySelector('.chart-shell');
     const summaryGrid = document.getElementById('summary-grid');
@@ -212,17 +220,100 @@
         return (parts[0] * 3600) + (parts[1] * 60) + parts[2];
     }
 
-    function getWindowedSeries() {
-        const series = dashboardData.combined_series || [];
-        if (!series.length) {
-            return [];
+    function getSeries() {
+        return dashboardData.combined_series || [];
+    }
+
+    function resetToLiveWindow() {
+        const series = getSeries();
+        const total = series.length;
+
+        if (!total) {
+            viewStartIndex = 0;
+            viewEndIndex = 0;
+            return;
         }
-        return series.slice(-currentWindowPoints);
+
+        const windowSize = Math.min(LIVE_WINDOW_POINTS, total);
+        viewEndIndex = total;
+        viewStartIndex = Math.max(0, total - windowSize);
+    }
+
+    function ensureValidWindow() {
+        const series = getSeries();
+        const total = series.length;
+
+        if (!total) {
+            viewStartIndex = 0;
+            viewEndIndex = 0;
+            return;
+        }
+
+        if (viewEndIndex <= viewStartIndex) {
+            resetToLiveWindow();
+        }
+
+        viewStartIndex = Math.max(0, viewStartIndex);
+        viewEndIndex = Math.min(total, viewEndIndex);
+
+        let size = viewEndIndex - viewStartIndex;
+        if (size < MIN_WINDOW_POINTS) {
+            viewEndIndex = Math.min(total, viewStartIndex + MIN_WINDOW_POINTS);
+            viewStartIndex = Math.max(0, viewEndIndex - MIN_WINDOW_POINTS);
+        }
+    }
+
+    function getWindowedSeries() {
+        const series = getSeries();
+        ensureValidWindow();
+        return series.slice(viewStartIndex, viewEndIndex);
     }
 
     function getWindowedChartEvents(series) {
         const times = new Set(series.map(item => item.time));
         return (dashboardData.chart_events || []).filter(event => times.has(event.time));
+    }
+
+    function findClosestSeriesIndexByTime(timeString) {
+        const series = getSeries();
+        if (!series.length) {
+            return -1;
+        }
+
+        const target = parseTimeToSeconds(timeString);
+        let bestIndex = -1;
+        let bestDistance = Number.MAX_SAFE_INTEGER;
+
+        series.forEach((item, index) => {
+            const itemSeconds = parseTimeToSeconds(item.time);
+            const distance = Math.abs(itemSeconds - target);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestIndex = index;
+            }
+        });
+
+        return bestIndex;
+    }
+
+    function centerViewOnIndex(index, preferredWindowSize = null) {
+        const series = getSeries();
+        const total = series.length;
+        if (!total || index < 0) {
+            return;
+        }
+
+        const currentSize = preferredWindowSize || Math.max(MIN_WINDOW_POINTS, viewEndIndex - viewStartIndex || LIVE_WINDOW_POINTS);
+        const half = Math.floor(currentSize / 2);
+
+        viewStartIndex = Math.max(0, index - half);
+        viewEndIndex = Math.min(total, viewStartIndex + currentSize);
+
+        if (viewEndIndex - viewStartIndex < currentSize) {
+            viewStartIndex = Math.max(0, viewEndIndex - currentSize);
+        }
+
+        renderChart();
     }
 
     function renderSummary() {
@@ -278,7 +369,7 @@
     function renderEvents() {
         const events = dashboardData.events || [];
         eventList.innerHTML = events.map(event => `
-            <div class="event-item">
+            <div class="event-item chart-focus-event" data-event-time="${escapeHtml(event.time.slice(11, 19))}">
                 <div class="event-top">
                     <strong>${escapeHtml(event.type)}</strong>
                     <span>${escapeHtml(event.time)}</span>
@@ -287,6 +378,17 @@
                 <small>${escapeHtml(event.impact)}</small>
             </div>
         `).join("");
+
+        document.querySelectorAll('.chart-focus-event').forEach(item => {
+            item.style.cursor = 'pointer';
+            item.addEventListener('click', () => {
+                const time = item.dataset.eventTime;
+                const index = findClosestSeriesIndexByTime(time);
+                if (index >= 0) {
+                    centerViewOnIndex(index, 24);
+                }
+            });
+        });
     }
 
     function renderArp() {
@@ -409,7 +511,7 @@
         const latencyThresholdData = combinedSeries.map(item => item.latency_threshold);
         const failedRequestsData = combinedSeries.map(item => item.failed_requests);
 
-        const chartEvents = dashboardData.chart_events || [];
+        const chartEvents = getWindowedChartEvents(combinedSeries);
 
         const downtimeBoxes = combinedSeries.map((item, index) => ({
             x: index,
@@ -665,18 +767,74 @@
         chartCanvas.addEventListener('wheel', (event) => {
             event.preventDefault();
 
+            const series = getSeries();
+            const total = series.length;
+            if (!total) return;
+
+            const rect = chartCanvas.getBoundingClientRect();
+            const mouseX = event.clientX - rect.left;
+            const ratio = Math.max(0, Math.min(1, mouseX / rect.width));
+
+            const currentSize = viewEndIndex - viewStartIndex;
+            let nextSize;
+
             if (event.deltaY < 0) {
-                currentWindowPoints = Math.max(12, Math.floor(currentWindowPoints * 0.8));
+                nextSize = Math.max(MIN_WINDOW_POINTS, Math.floor(currentSize * 0.8));
             } else {
-                currentWindowPoints = Math.min((dashboardData.combined_series || []).length, Math.ceil(currentWindowPoints * 1.25));
+                nextSize = Math.min(total, Math.ceil(currentSize * 1.25));
+            }
+
+            const focusIndex = viewStartIndex + Math.floor(currentSize * ratio);
+            const leftSize = Math.floor(nextSize * ratio);
+            const rightSize = nextSize - leftSize;
+
+            viewStartIndex = Math.max(0, focusIndex - leftSize);
+            viewEndIndex = Math.min(total, focusIndex + rightSize);
+
+            if (viewEndIndex - viewStartIndex < nextSize) {
+                if (viewStartIndex === 0) {
+                    viewEndIndex = Math.min(total, nextSize);
+                } else if (viewEndIndex === total) {
+                    viewStartIndex = Math.max(0, total - nextSize);
+                }
             }
 
             renderChart();
         }, { passive: false });
 
         chartCanvas.addEventListener('dblclick', () => {
-            currentWindowPoints = LIVE_WINDOW_POINTS;
+            resetToLiveWindow();
             renderChart();
+        });
+
+        chartCanvas.addEventListener('mousedown', (event) => {
+            isDragging = true;
+            dragStartX = event.clientX;
+            dragStartStartIndex = viewStartIndex;
+            dragStartEndIndex = viewEndIndex;
+        });
+
+        window.addEventListener('mousemove', (event) => {
+            if (!isDragging) return;
+
+            const series = getSeries();
+            const total = series.length;
+            const currentSize = dragStartEndIndex - dragStartStartIndex;
+            if (!currentSize || !total) return;
+
+            const rect = chartCanvas.getBoundingClientRect();
+            const pixelsPerPoint = rect.width / currentSize;
+            const deltaX = event.clientX - dragStartX;
+            const pointShift = Math.round(deltaX / pixelsPerPoint);
+
+            viewStartIndex = Math.max(0, Math.min(total - currentSize, dragStartStartIndex - pointShift));
+            viewEndIndex = viewStartIndex + currentSize;
+
+            renderChart();
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
         });
     }
 
@@ -697,20 +855,30 @@
                 return;
             }
 
+            const oldLength = getSeries().length;
             const freshData = await response.json();
             dashboardData = freshData;
 
-            const maxAvailable = (dashboardData.combined_series || []).length;
-            if (currentWindowPoints > maxAvailable && maxAvailable > 0) {
-                currentWindowPoints = maxAvailable;
+            const newLength = getSeries().length;
+            const currentSize = Math.max(MIN_WINDOW_POINTS, viewEndIndex - viewStartIndex);
+
+            if (viewEndIndex >= oldLength - 1) {
+                viewEndIndex = newLength;
+                viewStartIndex = Math.max(0, newLength - currentSize);
+            } else {
+                const diff = newLength - oldLength;
+                viewStartIndex = Math.max(0, viewStartIndex + diff);
+                viewEndIndex = Math.min(newLength, viewEndIndex + diff);
             }
 
+            ensureValidWindow();
             renderAll();
         } catch (error) {
             console.error('Dashboard refresh failed', error);
         }
     }
 
+    resetToLiveWindow();
     renderAll();
     setInterval(refreshDashboardData, POLL_INTERVAL_MS);
 </script>
