@@ -5,6 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Modbus Aware Firewall Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <style>
+        .chart-toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .chart-toolbar .zoom-btn {
+            background: rgba(18, 33, 56, 0.95);
+            color: #c7d3e2;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .chart-toolbar .zoom-btn.active {
+            border-color: rgba(111, 207, 255, 0.6);
+            color: #ffffff;
+        }
+
+        .chart-toolbar .live-note {
+            color: #91a5be;
+            font-size: 13px;
+        }
+    </style>
 </head>
 <body>
     <div class="layout">
@@ -28,9 +57,9 @@
             <div class="sidebar-card">
                 <h3>Sensor</h3>
                 <ul class="status-list">
-                    <li><span>Status</span><strong>{{ data.sensor.status }}</strong></li>
-                    <li><span>Mode</span><strong>{{ data.sensor.mode }}</strong></li>
-                    <li><span>Interface</span><strong>{{ data.sensor.interface }}</strong></li>
+                    <li><span>Status</span><strong id="sensor-status">{{ data.sensor.status }}</strong></li>
+                    <li><span>Mode</span><strong id="sensor-mode">{{ data.sensor.mode }}</strong></li>
+                    <li><span>Interface</span><strong id="sensor-interface">{{ data.sensor.interface }}</strong></li>
                 </ul>
             </div>
         </aside>
@@ -40,33 +69,32 @@
                 <div>
                     <p class="eyebrow">Industrial Monitoring</p>
                     <h2>Simple Production Overview</h2>
-                    <p class="subtle">Last update: {{ data.generated_at }}</p>
+                    <p class="subtle">Last update: <span id="generated-at">{{ data.generated_at }}</span></p>
                 </div>
 
                 <div class="topbar-actions">
                     <span class="pill">User {{ username }}</span>
-                    <span class="pill success">{{ data.sensor.status }}</span>
+                    <span class="pill success" id="sensor-pill">{{ data.sensor.status }}</span>
                     <a class="logout-link" href="{{ url_for('logout') }}">Logout</a>
                 </div>
             </header>
 
-            <section class="summary-grid">
-                {% for item in data.summary %}
-                <div class="card summary-card">
-                    <p class="summary-label">{{ item.label }}</p>
-                    <h3>{{ item.value }}</h3>
-                    <p class="summary-note">{{ item.note }}</p>
-                </div>
-                {% endfor %}
-            </section>
+            <section class="summary-grid" id="summary-grid"></section>
 
             <section class="chart-grid single-chart">
                 <div class="card">
                     <div class="panel-header">
                         <div>
                             <h3>Traffic and latency over time</h3>
-                            <p>{{ data.combined_note }}</p>
+                            <p id="combined-note">{{ data.combined_note }}</p>
                         </div>
+                    </div>
+
+                    <div class="chart-toolbar">
+                        <button class="zoom-btn active" data-window="12">Live</button>
+                        <button class="zoom-btn" data-window="60">5 min</button>
+                        <button class="zoom-btn" data-window="120">10 min</button>
+                        <span class="live-note" id="live-note">Auto-refresh every 5s. Auto-return to Live after 60s.</span>
                     </div>
 
                     <div class="chart-shell">
@@ -91,21 +119,21 @@
                         <h3>ARP detection</h3>
                         <p>Detect IP-to-MAC changes that can indicate ARP spoofing or MITM</p>
                     </div>
-                    <span class="badge {{ data.arp_monitor.status|lower }}">{{ data.arp_monitor.status }}</span>
+                    <span class="badge" id="arp-status-badge">{{ data.arp_monitor.status }}</span>
                 </div>
 
                 <div class="arp-summary">
                     <div class="arp-summary-card">
                         <span>Current status</span>
-                        <strong>{{ data.arp_monitor.summary }}</strong>
+                        <strong id="arp-summary">{{ data.arp_monitor.summary }}</strong>
                     </div>
                     <div class="arp-summary-card">
                         <span>Gateway expected MAC</span>
-                        <strong>{{ data.arp_monitor.gateway_expected_mac }}</strong>
+                        <strong id="arp-expected">{{ data.arp_monitor.gateway_expected_mac }}</strong>
                     </div>
                     <div class="arp-summary-card">
                         <span>Gateway seen MAC</span>
-                        <strong class="arp-bad">{{ data.arp_monitor.gateway_seen_mac }}</strong>
+                        <strong class="arp-bad" id="arp-seen">{{ data.arp_monitor.gateway_seen_mac }}</strong>
                     </div>
                 </div>
 
@@ -121,32 +149,11 @@
                                     <th>Status</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                {% for item in data.arp_monitor.critical_pairs %}
-                                <tr>
-                                    <td>{{ item.label }}</td>
-                                    <td>{{ item.ip }}</td>
-                                    <td>{{ item.expected_mac }}</td>
-                                    <td>{{ item.seen_mac }}</td>
-                                    <td><span class="badge {{ item.state }}">{{ item.state }}</span></td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
+                            <tbody id="arp-critical-pairs"></tbody>
                         </table>
                     </div>
 
-                    <div class="arp-event-list">
-                        {% for event in data.arp_monitor.events %}
-                        <div class="arp-event-item">
-                            <div class="event-top">
-                                <strong>{{ event.type }}</strong>
-                                <span class="badge {{ event.severity }}">{{ event.severity }}</span>
-                            </div>
-                            <p>{{ event.details }}</p>
-                            <small>{{ event.time }}</small>
-                        </div>
-                        {% endfor %}
-                    </div>
+                    <div class="arp-event-list" id="arp-event-list"></div>
                 </div>
             </section>
 
@@ -159,44 +166,7 @@
                         </div>
                     </div>
 
-                    <div class="connection-groups">
-                        {% for group in data.connections %}
-                        <div class="connection-group-card">
-                            <div class="connection-group-head">
-                                <div>
-                                    <h4>Master {{ group.master }}</h4>
-                                    <p>{{ group.slave_count }} slaves connected</p>
-                                </div>
-                                <div class="connection-group-meta">
-                                    <span>Last seen: {{ group.last_seen }}</span>
-                                </div>
-                            </div>
-
-                            <div class="table-wrap">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Slave</th>
-                                            <th>Status</th>
-                                            <th>Packets</th>
-                                            <th>Last seen</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for slave in group.slaves %}
-                                        <tr>
-                                            <td>{{ slave.ip }}</td>
-                                            <td><span class="badge {{ slave.status }}">{{ slave.status }}</span></td>
-                                            <td>{{ slave.packets }}</td>
-                                            <td>{{ slave.last_seen }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
+                    <div class="connection-groups" id="connection-groups"></div>
                 </div>
 
                 <div class="card">
@@ -207,18 +177,7 @@
                         </div>
                     </div>
 
-                    <div class="event-list">
-                        {% for event in data.events %}
-                        <div class="event-item">
-                            <div class="event-top">
-                                <strong>{{ event.type }}</strong>
-                                <span>{{ event.time }}</span>
-                            </div>
-                            <p>{{ event.details }}</p>
-                            <small>{{ event.impact }}</small>
-                        </div>
-                        {% endfor %}
-                    </div>
+                    <div class="event-list" id="event-list"></div>
                 </div>
             </section>
             
@@ -230,37 +189,230 @@
                     </div>
                 </div>
 
-                <div class="ports-grid">
-                    {% for port in data.ports %}
-                    <div class="port-card {{ port.state }}">
-                        <div class="port-head">
-                            <strong>{{ port.port }}</strong>
-                            <span class="badge {{ port.state }}">{{ port.state }}</span>
-                        </div>
-                        <h4>{{ port.name }}</h4>
-                        <p>Speed: {{ port.speed }}</p>
-                        <p>Activity: {{ port.activity }}</p>
-                    </div>
-                    {% endfor %}
-                </div>
+                <div class="ports-grid" id="ports-grid"></div>
             </section>
         </main>
     </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    const combinedSeries = {{ data.combined_series | tojson }};
-    const chartEvents = {{ data.chart_events | tojson }};
+    const initialData = {{ data | tojson }};
+    const DASHBOARD_API_URL = "http://host.docker.internal:8000/api/dashboard";
+    const POLL_INTERVAL_MS = 5000;
+    const LIVE_WINDOW_POINTS = 12;
+    const AUTO_RETURN_TO_LIVE_MS = 60000;
+
+    let dashboardData = initialData;
+    let chartInstance = null;
+    let currentWindowPoints = LIVE_WINDOW_POINTS;
+    let autoReturnTimer = null;
+
     const canvas = document.getElementById('trafficLatencyChart');
     const chartShell = canvas.parentElement;
+    const summaryGrid = document.getElementById('summary-grid');
+    const connectionGroups = document.getElementById('connection-groups');
+    const eventList = document.getElementById('event-list');
+    const arpCriticalPairs = document.getElementById('arp-critical-pairs');
+    const arpEventList = document.getElementById('arp-event-list');
+    const portsGrid = document.getElementById('ports-grid');
 
-    if (!combinedSeries || combinedSeries.length === 0) {
-        chartShell.innerHTML = `
-            <div class="chart-empty-state">
-                No traffic or latency data available yet.
+    function escapeHtml(value) {
+        return String(value ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function setActiveZoomButton() {
+        document.querySelectorAll('.zoom-btn').forEach(btn => {
+            const isActive = Number(btn.dataset.window) === currentWindowPoints;
+            btn.classList.toggle('active', isActive);
+        });
+    }
+
+    function scheduleAutoReturnToLive() {
+        if (autoReturnTimer) {
+            clearTimeout(autoReturnTimer);
+        }
+
+        if (currentWindowPoints === LIVE_WINDOW_POINTS) {
+            return;
+        }
+
+        autoReturnTimer = setTimeout(() => {
+            currentWindowPoints = LIVE_WINDOW_POINTS;
+            setActiveZoomButton();
+            renderChart();
+        }, AUTO_RETURN_TO_LIVE_MS);
+    }
+
+    function getWindowedSeries() {
+        const series = dashboardData.combined_series || [];
+        if (!series.length) {
+            return [];
+        }
+        return series.slice(-currentWindowPoints);
+    }
+
+    function getWindowedChartEvents(series) {
+        const times = new Set(series.map(item => item.time));
+        return (dashboardData.chart_events || []).filter(event => times.has(event.time));
+    }
+
+    function renderSummary() {
+        const summary = dashboardData.summary || [];
+        summaryGrid.innerHTML = summary.map(item => `
+            <div class="card summary-card">
+                <p class="summary-label">${escapeHtml(item.label)}</p>
+                <h3>${escapeHtml(item.value)}</h3>
+                <p class="summary-note">${escapeHtml(item.note)}</p>
             </div>
-        `;
-    } else {
+        `).join("");
+    }
+
+    function renderConnections() {
+        const connections = dashboardData.connections || [];
+
+        connectionGroups.innerHTML = connections.map(group => `
+            <div class="connection-group-card">
+                <div class="connection-group-head">
+                    <div>
+                        <h4>Master ${escapeHtml(group.master)}</h4>
+                        <p>${escapeHtml(group.slave_count)} slaves connected</p>
+                    </div>
+                    <div class="connection-group-meta">
+                        <span>Last seen: ${escapeHtml(group.last_seen)}</span>
+                    </div>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Slave</th>
+                                <th>Status</th>
+                                <th>Packets</th>
+                                <th>Last seen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${(group.slaves || []).map(slave => `
+                                <tr>
+                                    <td>${escapeHtml(slave.ip)}</td>
+                                    <td><span class="badge ${escapeHtml(slave.status)}">${escapeHtml(slave.status)}</span></td>
+                                    <td>${escapeHtml(slave.packets)}</td>
+                                    <td>${escapeHtml(slave.last_seen)}</td>
+                                </tr>
+                            `).join("")}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `).join("");
+    }
+
+    function renderEvents() {
+        const events = dashboardData.events || [];
+
+        eventList.innerHTML = events.map(event => `
+            <div class="event-item">
+                <div class="event-top">
+                    <strong>${escapeHtml(event.type)}</strong>
+                    <span>${escapeHtml(event.time)}</span>
+                </div>
+                <p>${escapeHtml(event.details)}</p>
+                <small>${escapeHtml(event.impact)}</small>
+            </div>
+        `).join("");
+    }
+
+    function renderArp() {
+        const arp = dashboardData.arp_monitor || {};
+
+        document.getElementById('arp-status-badge').textContent = arp.status || "Normal";
+        document.getElementById('arp-status-badge').className = `badge ${(arp.status || "normal").toLowerCase()}`;
+        document.getElementById('arp-summary').textContent = arp.summary || "-";
+        document.getElementById('arp-expected').textContent = arp.gateway_expected_mac || "-";
+        document.getElementById('arp-seen').textContent = arp.gateway_seen_mac || "-";
+
+        arpCriticalPairs.innerHTML = (arp.critical_pairs || []).map(item => `
+            <tr>
+                <td>${escapeHtml(item.label)}</td>
+                <td>${escapeHtml(item.ip)}</td>
+                <td>${escapeHtml(item.expected_mac)}</td>
+                <td>${escapeHtml(item.seen_mac)}</td>
+                <td><span class="badge ${escapeHtml(item.state)}">${escapeHtml(item.state)}</span></td>
+            </tr>
+        `).join("");
+
+        arpEventList.innerHTML = (arp.events || []).map(event => `
+            <div class="arp-event-item">
+                <div class="event-top">
+                    <strong>${escapeHtml(event.type)}</strong>
+                    <span class="badge ${escapeHtml(event.severity)}">${escapeHtml(event.severity)}</span>
+                </div>
+                <p>${escapeHtml(event.details)}</p>
+                <small>${escapeHtml(event.time)}</small>
+            </div>
+        `).join("");
+    }
+
+    function renderPorts() {
+        const ports = dashboardData.ports || [];
+
+        portsGrid.innerHTML = ports.map(port => `
+            <div class="port-card ${escapeHtml(port.state)}">
+                <div class="port-head">
+                    <strong>${escapeHtml(port.port)}</strong>
+                    <span class="badge ${escapeHtml(port.state)}">${escapeHtml(port.state)}</span>
+                </div>
+                <h4>${escapeHtml(port.name)}</h4>
+                <p>Speed: ${escapeHtml(port.speed)}</p>
+                <p>Activity: ${escapeHtml(port.activity)}</p>
+            </div>
+        `).join("");
+    }
+
+    function renderHeader() {
+        document.getElementById('generated-at').textContent = dashboardData.generated_at || "live";
+        document.getElementById('sensor-status').textContent = dashboardData.sensor?.status || "-";
+        document.getElementById('sensor-mode').textContent = dashboardData.sensor?.mode || "-";
+        document.getElementById('sensor-interface').textContent = dashboardData.sensor?.interface || "-";
+        document.getElementById('sensor-pill').textContent = dashboardData.sensor?.status || "-";
+        document.getElementById('combined-note').textContent = dashboardData.combined_note || "";
+    }
+
+    function destroyChartIfExists() {
+        if (chartInstance) {
+            chartInstance.destroy();
+            chartInstance = null;
+        }
+    }
+
+    function renderChart() {
+        const combinedSeries = getWindowedSeries();
+        const chartEvents = getWindowedChartEvents(combinedSeries);
+
+        destroyChartIfExists();
+
+        if (!combinedSeries.length) {
+            chartShell.innerHTML = `
+                <div class="chart-empty-state">
+                    No traffic or latency data available yet.
+                </div>
+            `;
+            return;
+        }
+
+        if (!document.getElementById('trafficLatencyChart')) {
+            chartShell.innerHTML = '<canvas id="trafficLatencyChart"></canvas>';
+        }
+
+        const chartCanvas = document.getElementById('trafficLatencyChart');
+        const ctx = chartCanvas.getContext('2d');
+
         const labels = combinedSeries.map(item => item.time);
         const trafficData = combinedSeries.map(item => item.traffic);
         const latencyData = combinedSeries.map(item => item.latency);
@@ -323,7 +475,6 @@
                 meta.data.forEach((point, index) => {
                     const event = eventPoints[index];
                     if (!event) return;
-
                     ctx.fillText(event.label, point.x + 8, point.y - 10);
                 });
 
@@ -331,9 +482,7 @@
             }
         };
 
-        const ctx = canvas.getContext('2d');
-
-        new Chart(ctx, {
+        chartInstance = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: labels,
@@ -427,6 +576,7 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: false,
                 interaction: {
                     mode: 'index',
                     intersect: false
@@ -485,7 +635,7 @@
                         },
                         title: {
                             display: true,
-                            text: 'Latency (s)',
+                            text: 'Latency (ms)',
                             color: '#91a5be'
                         }
                     },
@@ -498,6 +648,44 @@
             plugins: [downtimePlugin, eventLabelPlugin]
         });
     }
+
+    function renderAll() {
+        renderHeader();
+        renderSummary();
+        renderConnections();
+        renderEvents();
+        renderArp();
+        renderPorts();
+        renderChart();
+    }
+
+    async function refreshDashboardData() {
+        try {
+            const response = await fetch(DASHBOARD_API_URL, { cache: 'no-store' });
+            if (!response.ok) {
+                return;
+            }
+
+            const freshData = await response.json();
+            dashboardData = freshData;
+            renderAll();
+        } catch (error) {
+            console.error('Dashboard refresh failed', error);
+        }
+    }
+
+    document.querySelectorAll('.zoom-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            currentWindowPoints = Number(btn.dataset.window);
+            setActiveZoomButton();
+            scheduleAutoReturnToLive();
+            renderChart();
+        });
+    });
+
+    setActiveZoomButton();
+    renderAll();
+    setInterval(refreshDashboardData, POLL_INTERVAL_MS);
 </script>
 
 </body>
