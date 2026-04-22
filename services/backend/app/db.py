@@ -17,15 +17,9 @@ def init_db():
     conn = get_connection()
     cur = conn.cursor()
 
-    cur.execute("DROP TABLE IF EXISTS metrics_bucket CASCADE;")
-    cur.execute("DROP TABLE IF EXISTS events CASCADE;")
-    cur.execute("DROP TABLE IF EXISTS modbus_register_state CASCADE;")
-    cur.execute("DROP TABLE IF EXISTS observed_connections CASCADE;")
-    cur.execute("DROP TABLE IF EXISTS devices CASCADE;")
-
     cur.execute(
         """
-        CREATE TABLE devices (
+        CREATE TABLE IF NOT EXISTS devices (
             id SERIAL PRIMARY KEY,
             ip INET NOT NULL UNIQUE,
             mac TEXT,
@@ -38,7 +32,7 @@ def init_db():
 
     cur.execute(
         """
-        CREATE TABLE observed_connections (
+        CREATE TABLE IF NOT EXISTS observed_connections (
             id SERIAL PRIMARY KEY,
             master_ip INET NOT NULL,
             slave_ip INET NOT NULL,
@@ -53,7 +47,7 @@ def init_db():
 
     cur.execute(
         """
-        CREATE TABLE modbus_register_state (
+        CREATE TABLE IF NOT EXISTS modbus_register_state (
             id SERIAL PRIMARY KEY,
             slave_ip INET NOT NULL,
             unit_id INTEGER NOT NULL,
@@ -70,7 +64,7 @@ def init_db():
 
     cur.execute(
         """
-        CREATE TABLE events (
+        CREATE TABLE IF NOT EXISTS events (
             id BIGSERIAL PRIMARY KEY,
             ts TIMESTAMP NOT NULL DEFAULT NOW(),
             event_type TEXT NOT NULL,
@@ -90,7 +84,7 @@ def init_db():
 
     cur.execute(
         """
-        CREATE TABLE metrics_bucket (
+        CREATE TABLE IF NOT EXISTS metrics_bucket (
             id BIGSERIAL PRIMARY KEY,
             bucket_ts TIMESTAMP NOT NULL UNIQUE,
             traffic_count BIGINT NOT NULL DEFAULT 0,
@@ -105,11 +99,11 @@ def init_db():
         """
     )
 
-    cur.execute("CREATE INDEX idx_devices_last_seen ON devices (last_seen DESC);")
-    cur.execute("CREATE INDEX idx_connections_last_seen ON observed_connections (last_seen DESC);")
-    cur.execute("CREATE INDEX idx_register_state_slave ON modbus_register_state (slave_ip, unit_id);")
-    cur.execute("CREATE INDEX idx_events_ts ON events (ts DESC);")
-    cur.execute("CREATE INDEX idx_metrics_bucket_ts ON metrics_bucket (bucket_ts DESC);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_devices_last_seen ON devices (last_seen DESC);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_connections_last_seen ON observed_connections (last_seen DESC);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_register_state_slave ON modbus_register_state (slave_ip, unit_id);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_events_ts ON events (ts DESC);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_metrics_bucket_ts ON metrics_bucket (bucket_ts DESC);")
 
     conn.commit()
     cur.close()
