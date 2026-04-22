@@ -1,26 +1,32 @@
+import logging
 import os
+import subprocess
 import threading
 
-from parser import parse_packet
-from storage import save_packet
-
-import logging
-import subprocess
 from scapy.all import sniff
 
-CAPTURE_INTERFACE = os.getenv("CAPTURE_INTERFACE", "eth0") 
+from parser import parse_packet
+from state_manager import process_observation
+
+CAPTURE_INTERFACE = os.getenv("CAPTURE_INTERFACE", "eth0")
+CAPTURE_FILTER = os.getenv("CAPTURE_FILTER", "arp or tcp port 502")
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 
 def handle_packet(pkt):
-    data = parse_packet(pkt)
-    save_packet(data)
+    try:
+        data = parse_packet(pkt)
+        if data is None:
+            return
+        process_observation(data)
+    except Exception:
+        logger.exception("Failed to process packet")
 
 
 def run_capture():
-    start_capture(CAPTURE_INTERFACE, handle_packet)
+    start_capture(CAPTURE_INTERFACE)
 
 
 def start_capture_thread():
@@ -35,7 +41,13 @@ def setup_interface(interface: str) -> None:
     logger.info("Interface ready: %s", interface)
 
 
-def start_capture(interface: str, handler) -> None:
+def start_capture(interface: str) -> None:
     setup_interface(interface)
-    logger.info("Starting sniff on interface: %s", interface)
-    sniff(iface=interface, prn=handler, store=False, promisc=True)
+    logger.info("Starting sniff on interface: %s with filter: %s", interface, CAPTURE_FILTER)
+    sniff(
+        iface=interface,
+        prn=handle_packet,
+        store=False,
+        promisc=True,
+        filter=CAPTURE_FILTER,
+    )

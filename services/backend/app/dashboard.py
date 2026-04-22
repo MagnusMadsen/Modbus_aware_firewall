@@ -1,6 +1,8 @@
 import os
-from db import get_connection
+
 from psycopg2.extras import RealDictCursor
+
+from db import get_connection
 
 CAPTURE_INTERFACE = os.getenv("CAPTURE_INTERFACE", "eth0")
 
@@ -10,224 +12,208 @@ def get_device_count(cur):
     return cur.fetchone()["count"]
 
 
-def get_recent_packet_count(cur):
-    cur.execute("""
-        SELECT COUNT(*) AS count
-        FROM packet_logs
-        WHERE ts >= NOW() - INTERVAL '60 seconds'
-    """)
-    return cur.fetchone()["count"]
-
-
-def get_recent_arp_count(cur):
-    cur.execute("""
-        SELECT COUNT(*) AS count
-        FROM packet_logs
-        WHERE protocol = 'ARP'
-          AND ts >= NOW() - INTERVAL '60 seconds'
-    """)
-    return cur.fetchone()["count"]
-
-
-def get_traffic_rows(cur):
-    cur.execute("""
+def get_recent_metrics(cur):
+    cur.execute(
+        """
         SELECT
-            TO_CHAR(date_trunc('minute', ts), 'HH24:MI') AS time,
-            COUNT(*) AS traffic
-        FROM packet_logs
-        WHERE ts >= NOW() - INTERVAL '10 minutes'
-        GROUP BY date_trunc('minute', ts)
-        ORDER BY date_trunc('minute', ts)
-    """)
-    return cur.fetchall()
+            COALESCE(SUM(traffic_count), 0) AS traffic_count,
+            COALESCE(SUM(request_count), 0) AS request_count,
+            COALESCE(SUM(response_count), 0) AS response_count,
+            COALESCE(SUM(failed_count), 0) AS failed_count,
+            COALESCE(SUM(arp_count), 0) AS arp_count,
+            ROUND(AVG(avg_latency_ms)::numeric, 2) AS avg_latency_ms
+        FROM metrics_bucket
+        WHERE bucket_ts >= NOW() - INTERVAL '60 seconds'
+        """
+    )
+    return cur.fetchone()
 
 
-def build_combined_series(traffic_rows):
-    return [
-        {
-            "time": row["time"],
-            "traffic": row["traffic"],
-            "latency": 0,
-            "traffic_baseline": 0,
-            "latency_baseline": 0,
-            "latency_threshold": 0,
-            "failed_requests": 0,
-            "downtime": False,
-        }
-        for row in traffic_rows
-    ]
-
-
-def fetch_summary():
-    conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-
-    device_count = get_device_count(cur)
-    recent_packets = get_recent_packet_count(cur)
-    arp_packets = get_recent_arp_count(cur)
-    traffic_rows = get_traffic_rows(cur)
-    connections = get_master_slave_groups(cur)
-    device_roles = get_device_roles(cur)
-
-    cur.close()
-    conn.close()
-
-    combined_series = build_combined_series(traffic_rows)
-
-    return {
-        "generated_at": "live",
-        "sensor": {
-            "status": "Online",
-            "mode": "Passive monitoring",
-            "interface": CAPTURE_INTERFACE,
-        },
-        "summary": [
-            {"label": "Online devices", "value": device_count, "note": "Observed in SQL"},
-            {"label": "Packets last 60s", "value": recent_packets, "note": "Live capture"},
-            {"label": "ARP last 60s", "value": arp_packets, "note": "Live capture"},
-        ],
-        "combined_series": combined_series,
-        "chart_events": [],
-        "combined_note": "Live traffic from packet_logs. Latency not implemented yet.",
-        "arp_monitor": {
-            "status": "Normal",
-            "summary": f"{arp_packets} ARP packets last 60s",
-            "gateway_ip": "-",
-            "gateway_expected_mac": "-",
-            "gateway_seen_mac": "-",
-            "critical_pairs": [],
-            "events": [],
-        },
-        "connections": connections,
-        "device_roles": device_roles,
-        "ports": [],
-        "events": [],
-    }
-
-def fetch_devices():
-    conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-
-    cur.execute("""
-        SELECT ip, mac, first_seen, last_seen
-        FROM devices
-        ORDER BY last_seen DESC
-    """)
+def get_combined_series(cur):
+    cur.execute(
+        """
+        SELECT
+            bucket_ts,
+            TO_CHAR(bucket_ts, 'HH24:MI:SS') AS time,
+            traffic_count AS traffic,
+            COALESCE(avg_latency_ms, 0) AS latency,
+            failed_count AS failed_requests,
+            CASE WHEN traffic_count = 0 THEN TRUE ELSE FALSE END AS downtime
+        FROM metrics_bucket
+        WHERE bucket_ts >= NOW() - INTERVAL '10 minutes'
+        ORDER BY bucket_ts
+        """
+    )
     rows = cur.fetchall()
 
-    cur.close()
-    conn.close()
+    series = []
+    traffic_history = []
+    latency_history = []
 
-    return rows
+    for row in rows:
+        traffic = row["traffic"] or 0
+        latency = row["latency"] or 0
 
-def get_device_roles(cur):
-    cur.execute("""
+        traffic_history.append(traffic)
+        if latency > 0:
+            latency_history.append(latency)
+
+        traffic_baseline = round(sum(traffic_history) / len(traffic_history), 2) if traffic_history else 0
+        latency_baseline = round(sum(latency_history) / len(latency_history), 2) if latency_history else 0
+        latency_threshold = round(latency_baseline * 1.5, 2) if latency_baseline else 0
+
+        series.append(
+            {
+                "time": row["time"],
+                "traffic": traffic,
+                "latency": latency,
+                "traffic_baseline": traffic_baseline,
+                "latency_baseline": latency_baseline,
+                "latency_threshold": latency_threshold,
+                "failed_requests": row["failed_requests"] or 0,
+                "downtime": bool(row["downtime"]),
+            }
+        )
+
+    return series
+
+
+def get_chart_events(cur):
+    cur.execute(
+        """
         SELECT
-            ip,
-            COUNT(DISTINCT peer_ip) AS peer_count,
-            CASE
-                WHEN COUNT(DISTINCT peer_ip) = 0 THEN 'unknown'
-                WHEN COUNT(DISTINCT peer_ip) = 1 THEN 'slave'
-                ELSE 'master'
-            END AS role
-        FROM (
-            SELECT src_ip AS ip, dst_ip AS peer_ip
-            FROM observed_connections
-            WHERE src_ip IS NOT NULL AND dst_ip IS NOT NULL
-
-            UNION
-
-            SELECT dst_ip AS ip, src_ip AS peer_ip
-            FROM observed_connections
-            WHERE src_ip IS NOT NULL AND dst_ip IS NOT NULL
-        ) peers
-        GROUP BY ip
-        ORDER BY peer_count DESC, ip
-    """)
-    return cur.fetchall()
-
-def get_observed_connections(cur):
-    cur.execute("""
-        SELECT
-            src_ip,
-            dst_ip,
-            protocol,
-            src_port,
-            dst_port,
-            first_seen,
-            last_seen,
-            packet_count
-        FROM observed_connections
-        ORDER BY last_seen DESC
+            TO_CHAR(ts, 'HH24:MI:SS') AS time,
+            event_type,
+            severity,
+            source_ip::text AS source_ip,
+            target_ip::text AS target_ip,
+            register_address,
+            old_value,
+            new_value
+        FROM events
+        WHERE ts >= NOW() - INTERVAL '10 minutes'
+        ORDER BY ts DESC
         LIMIT 20
-    """)
-    return cur.fetchall()
+        """
+    )
+    rows = cur.fetchall()
+
+    events = []
+    for row in rows:
+        label = row["event_type"]
+        if row["register_address"] is not None:
+            label = f"{row['event_type']} reg {row['register_address']}"
+
+        events.append(
+            {
+                "time": row["time"],
+                "label": label,
+                "severity": row["severity"],
+            }
+        )
+
+    return list(reversed(events))
+
+
+def get_recent_events(cur):
+    cur.execute(
+        """
+        SELECT
+            TO_CHAR(ts, 'YYYY-MM-DD HH24:MI:SS') AS time,
+            event_type,
+            severity,
+            source_ip::text AS source_ip,
+            target_ip::text AS target_ip,
+            register_address,
+            old_value,
+            new_value,
+            details
+        FROM events
+        ORDER BY ts DESC
+        LIMIT 20
+        """
+    )
+    rows = cur.fetchall()
+
+    events = []
+    for row in rows:
+        parts = []
+
+        if row["source_ip"] and row["target_ip"]:
+            parts.append(f"{row['source_ip']} -> {row['target_ip']}")
+
+        if row["register_address"] is not None:
+            parts.append(f"register {row['register_address']}")
+
+        if row["old_value"] is not None or row["new_value"] is not None:
+            parts.append(f"{row['old_value']} -> {row['new_value']}")
+
+        details = row["details"] or {}
+        message = details.get("message", row["event_type"])
+
+        events.append(
+            {
+                "type": row["event_type"],
+                "time": row["time"],
+                "details": " | ".join(parts) if parts else message,
+                "impact": message,
+            }
+        )
+
+    return events
+
+
+def get_arp_monitor(cur):
+    cur.execute(
+        """
+        SELECT
+            TO_CHAR(ts, 'YYYY-MM-DD HH24:MI:SS') AS time,
+            source_ip::text AS source_ip,
+            old_value,
+            new_value
+        FROM events
+        WHERE event_type = 'arp_mac_changed'
+        ORDER BY ts DESC
+        LIMIT 10
+        """
+    )
+    rows = cur.fetchall()
+
+    events = []
+    for row in rows:
+        events.append(
+            {
+                "type": "ARP MAC change",
+                "severity": "high",
+                "details": f"{row['source_ip']} changed MAC from {row['old_value']} to {row['new_value']}",
+                "time": row["time"],
+            }
+        )
+
+    return {
+        "status": "Warning" if events else "Normal",
+        "summary": f"{len(events)} ARP MAC change events" if events else "No ARP anomalies detected",
+        "gateway_ip": "-",
+        "gateway_expected_mac": "-",
+        "gateway_seen_mac": "-",
+        "critical_pairs": [],
+        "events": events,
+    }
 
 
 def get_master_slave_groups(cur):
-    cur.execute("""
-        WITH peer_stats AS (
-            SELECT
-                ip,
-                COUNT(DISTINCT peer_ip) AS peer_count
-            FROM (
-                SELECT src_ip AS ip, dst_ip AS peer_ip
-                FROM observed_connections
-                WHERE src_ip IS NOT NULL AND dst_ip IS NOT NULL
-
-                UNION
-
-                SELECT dst_ip AS ip, src_ip AS peer_ip
-                FROM observed_connections
-                WHERE src_ip IS NOT NULL AND dst_ip IS NOT NULL
-            ) peers
-            GROUP BY ip
-        ),
-        relation_stats AS (
-            SELECT
-                a.ip AS ip_a,
-                b.ip AS ip_b,
-                a.peer_count AS peer_count_a,
-                b.peer_count AS peer_count_b
-            FROM peer_stats a
-            JOIN peer_stats b ON a.ip < b.ip
-        ),
-        directed_relations AS (
-            SELECT
-                CASE
-                    WHEN peer_count_a > peer_count_b THEN ip_a
-                    WHEN peer_count_b > peer_count_a THEN ip_b
-                    ELSE LEAST(ip_a, ip_b)
-                END AS master_ip,
-                CASE
-                    WHEN peer_count_a > peer_count_b THEN ip_b
-                    WHEN peer_count_b > peer_count_a THEN ip_a
-                    ELSE GREATEST(ip_a, ip_b)
-                END AS slave_ip
-            FROM relation_stats
-        ),
-        aggregated_relations AS (
-            SELECT
-                dr.master_ip,
-                dr.slave_ip,
-                SUM(oc.packet_count) AS packets,
-                MAX(oc.last_seen) AS last_seen
-            FROM directed_relations dr
-            JOIN observed_connections oc
-              ON (
-                   (oc.src_ip = dr.master_ip AND oc.dst_ip = dr.slave_ip)
-                OR (oc.src_ip = dr.slave_ip AND oc.dst_ip = dr.master_ip)
-              )
-            GROUP BY dr.master_ip, dr.slave_ip
-        )
+    cur.execute(
+        """
         SELECT
-            master_ip,
-            slave_ip,
-            packets,
-            last_seen
-        FROM aggregated_relations
-        ORDER BY master_ip, slave_ip
-    """)
+            master_ip::text AS master_ip,
+            slave_ip::text AS slave_ip,
+            COALESCE(unit_id, 0) AS unit_id,
+            request_count,
+            TO_CHAR(last_seen, 'YYYY-MM-DD HH24:MI:SS') AS last_seen
+        FROM observed_connections
+        ORDER BY master_ip, slave_ip, unit_id
+        """
+    )
     rows = cur.fetchall()
 
     groups = {}
@@ -241,16 +227,79 @@ def get_master_slave_groups(cur):
                 "slaves": [],
             }
 
-        groups[master]["slaves"].append({
-            "ip": row["slave_ip"],
-            "status": "online",
-            "packets": row["packets"],
-            "last_seen": row["last_seen"],
-        })
-
+        groups[master]["slaves"].append(
+            {
+                "ip": f"{row['slave_ip']} (unit {row['unit_id']})" if row["unit_id"] else row["slave_ip"],
+                "status": "online",
+                "packets": row["request_count"],
+                "last_seen": row["last_seen"],
+            }
+        )
         groups[master]["slave_count"] += 1
-
-        if row["last_seen"] and row["last_seen"] > groups[master]["last_seen"]:
-            groups[master]["last_seen"] = row["last_seen"]
+        groups[master]["last_seen"] = max(groups[master]["last_seen"], row["last_seen"])
 
     return list(groups.values())
+
+
+def fetch_summary():
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    device_count = get_device_count(cur)
+    recent_metrics = get_recent_metrics(cur)
+    combined_series = get_combined_series(cur)
+    chart_events = get_chart_events(cur)
+    recent_events = get_recent_events(cur)
+    arp_monitor = get_arp_monitor(cur)
+    connections = get_master_slave_groups(cur)
+
+    cur.close()
+    conn.close()
+
+    avg_latency = recent_metrics["avg_latency_ms"] or 0
+
+    return {
+        "generated_at": "live",
+        "sensor": {
+            "status": "Online",
+            "mode": "Passive monitoring",
+            "interface": CAPTURE_INTERFACE,
+        },
+        "summary": [
+            {"label": "Online devices", "value": device_count, "note": "Observed devices"},
+            {"label": "Requests last 60s", "value": recent_metrics["request_count"], "note": "From SQL buckets"},
+            {"label": "Avg latency ms", "value": avg_latency, "note": "Matched request/response"},
+        ],
+        "combined_series": combined_series,
+        "chart_events": chart_events,
+        "combined_note": "Traffic, latency, failures and anomalies from SQL buckets.",
+        "arp_monitor": arp_monitor,
+        "connections": connections,
+        "device_roles": [],
+        "ports": [],
+        "events": recent_events,
+    }
+
+
+def fetch_devices():
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    cur.execute(
+        """
+        SELECT
+            ip::text AS ip,
+            mac,
+            role,
+            TO_CHAR(first_seen, 'YYYY-MM-DD HH24:MI:SS') AS first_seen,
+            TO_CHAR(last_seen, 'YYYY-MM-DD HH24:MI:SS') AS last_seen
+        FROM devices
+        ORDER BY last_seen DESC
+        """
+    )
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return rows
