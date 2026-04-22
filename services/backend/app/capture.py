@@ -4,6 +4,7 @@ import subprocess
 import threading
 
 from scapy.all import sniff
+from scapy.error import Scapy_Exception
 
 from parser import parse_packet
 from state_manager import process_observation
@@ -44,10 +45,20 @@ def setup_interface(interface: str) -> None:
 def start_capture(interface: str) -> None:
     setup_interface(interface)
     logger.info("Starting sniff on interface: %s with filter: %s", interface, CAPTURE_FILTER)
-    sniff(
-        iface=interface,
-        prn=handle_packet,
-        store=False,
-        promisc=True,
-        filter=CAPTURE_FILTER,
-    )
+
+    try:
+        sniff(
+            iface=interface,
+            prn=handle_packet,
+            store=False,
+            promisc=True,
+            filter=CAPTURE_FILTER,
+        )
+    except Scapy_Exception:
+        logger.exception("Filtered sniff failed. Falling back to unfiltered sniff.")
+        sniff(
+            iface=interface,
+            prn=handle_packet,
+            store=False,
+            promisc=True,
+        )
