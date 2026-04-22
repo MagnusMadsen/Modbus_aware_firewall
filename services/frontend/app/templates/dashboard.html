@@ -8,25 +8,10 @@
     <style>
         .chart-toolbar {
             display: flex;
-            gap: 10px;
+            gap: 12px;
             align-items: center;
             flex-wrap: wrap;
             margin-top: 10px;
-        }
-
-        .chart-toolbar .zoom-btn {
-            background: rgba(18, 33, 56, 0.95);
-            color: #c7d3e2;
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 10px;
-            padding: 8px 12px;
-            cursor: pointer;
-            font-size: 13px;
-        }
-
-        .chart-toolbar .zoom-btn.active {
-            border-color: rgba(111, 207, 255, 0.6);
-            color: #ffffff;
         }
 
         .chart-toolbar .live-note {
@@ -91,10 +76,7 @@
                     </div>
 
                     <div class="chart-toolbar">
-                        <button class="zoom-btn active" data-window="12">Live</button>
-                        <button class="zoom-btn" data-window="60">5 min</button>
-                        <button class="zoom-btn" data-window="120">10 min</button>
-                        <span class="live-note" id="live-note">Auto-refresh every 5s. Auto-return to Live after 60s.</span>
+                        <span class="live-note">Scroll to zoom. Double click to reset to live window. Auto-refresh every 5s.</span>
                     </div>
 
                     <div class="chart-shell">
@@ -199,16 +181,13 @@
     const initialData = {{ data | tojson }};
     const DASHBOARD_API_URL = "/api/live-dashboard";
     const POLL_INTERVAL_MS = 5000;
-    const LIVE_WINDOW_POINTS = 12;
-    const AUTO_RETURN_TO_LIVE_MS = 60000;
+    const LIVE_WINDOW_POINTS = 60;
 
     let dashboardData = initialData;
     let chartInstance = null;
     let currentWindowPoints = LIVE_WINDOW_POINTS;
-    let autoReturnTimer = null;
 
-    const canvas = document.getElementById('trafficLatencyChart');
-    const chartShell = canvas.parentElement;
+    const chartShell = document.querySelector('.chart-shell');
     const summaryGrid = document.getElementById('summary-grid');
     const connectionGroups = document.getElementById('connection-groups');
     const eventList = document.getElementById('event-list');
@@ -225,27 +204,12 @@
             .replace(/'/g, "&#039;");
     }
 
-    function setActiveZoomButton() {
-        document.querySelectorAll('.zoom-btn').forEach(btn => {
-            const isActive = Number(btn.dataset.window) === currentWindowPoints;
-            btn.classList.toggle('active', isActive);
-        });
-    }
-
-    function scheduleAutoReturnToLive() {
-        if (autoReturnTimer) {
-            clearTimeout(autoReturnTimer);
+    function parseTimeToSeconds(timeString) {
+        const parts = String(timeString).split(':').map(Number);
+        if (parts.length !== 3) {
+            return 0;
         }
-
-        if (currentWindowPoints === LIVE_WINDOW_POINTS) {
-            return;
-        }
-
-        autoReturnTimer = setTimeout(() => {
-            currentWindowPoints = LIVE_WINDOW_POINTS;
-            setActiveZoomButton();
-            renderChart();
-        }, AUTO_RETURN_TO_LIVE_MS);
+        return (parts[0] * 3600) + (parts[1] * 60) + parts[2];
     }
 
     function getWindowedSeries() {
@@ -274,7 +238,6 @@
 
     function renderConnections() {
         const connections = dashboardData.connections || [];
-
         connectionGroups.innerHTML = connections.map(group => `
             <div class="connection-group-card">
                 <div class="connection-group-head">
@@ -286,7 +249,6 @@
                         <span>Last seen: ${escapeHtml(group.last_seen)}</span>
                     </div>
                 </div>
-
                 <div class="table-wrap">
                     <table>
                         <thead>
@@ -315,7 +277,6 @@
 
     function renderEvents() {
         const events = dashboardData.events || [];
-
         eventList.innerHTML = events.map(event => `
             <div class="event-item">
                 <div class="event-top">
@@ -361,7 +322,6 @@
 
     function renderPorts() {
         const ports = dashboardData.ports || [];
-
         portsGrid.innerHTML = ports.map(port => `
             <div class="port-card ${escapeHtml(port.state)}">
                 <div class="port-head">
@@ -391,10 +351,41 @@
         }
     }
 
+    function computeTrafficAxisBounds(series) {
+        const values = series.map(item => Number(item.traffic || 0));
+        if (!values.length) {
+            return { min: 0, max: 10 };
+        }
+
+        const minValue = Math.min(...values);
+        const maxValue = Math.max(...values);
+        const range = Math.max(10, maxValue - minValue);
+        const padding = Math.max(5, Math.round(range * 0.15));
+
+        return {
+            min: Math.max(0, minValue - padding),
+            max: maxValue + padding
+        };
+    }
+
+    function computeLatencyAxisBounds(series) {
+        const values = series.flatMap(item => [
+            Number(item.latency || 0),
+            Number(item.latency_baseline || 0),
+            Number(item.latency_threshold || 0)
+        ]);
+
+        const maxValue = Math.max(...values, 10);
+        const padding = Math.max(2, Math.round(maxValue * 0.15));
+
+        return {
+            min: 0,
+            max: maxValue + padding
+        };
+    }
+
     function renderChart() {
         const combinedSeries = getWindowedSeries();
-        const chartEvents = getWindowedChartEvents(combinedSeries);
-
         destroyChartIfExists();
 
         if (!combinedSeries.length) {
@@ -406,10 +397,7 @@
             return;
         }
 
-        if (!document.getElementById('trafficLatencyChart')) {
-            chartShell.innerHTML = '<canvas id="trafficLatencyChart"></canvas>';
-        }
-
+        chartShell.innerHTML = '<canvas id="trafficLatencyChart"></canvas>';
         const chartCanvas = document.getElementById('trafficLatencyChart');
         const ctx = chartCanvas.getContext('2d');
 
@@ -421,21 +409,39 @@
         const latencyThresholdData = combinedSeries.map(item => item.latency_threshold);
         const failedRequestsData = combinedSeries.map(item => item.failed_requests);
 
+        const chartEvents = dashboardData.chart_events || [];
+
         const downtimeBoxes = combinedSeries.map((item, index) => ({
             x: index,
             active: item.downtime
         }));
 
         const eventPoints = chartEvents.map(event => {
-            const index = labels.indexOf(event.time);
-            const latencyPoint = combinedSeries[index]?.latency ?? null;
+            let closestIndex = -1;
+            let closestDistance = Number.MAX_SAFE_INTEGER;
+
+            labels.forEach((label, index) => {
+                const eventSeconds = parseTimeToSeconds(event.time);
+                const labelSeconds = parseTimeToSeconds(label);
+                const distance = Math.abs(eventSeconds - labelSeconds);
+
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    closestIndex = index;
+                }
+            });
+
+            if (closestIndex === -1) {
+                return null;
+            }
+
             return {
-                x: event.time,
-                y: latencyPoint,
+                x: labels[closestIndex],
+                y: combinedSeries[closestIndex]?.latency ?? 0,
                 label: event.label,
                 severity: event.severity
             };
-        }).filter(item => item.y !== null);
+        }).filter(Boolean);
 
         const downtimePlugin = {
             id: 'downtimePlugin',
@@ -481,6 +487,9 @@
                 ctx.restore();
             }
         };
+
+        const trafficBounds = computeTrafficAxisBounds(combinedSeries);
+        const latencyBounds = computeLatencyAxisBounds(combinedSeries);
 
         chartInstance = new Chart(ctx, {
             type: 'line',
@@ -594,7 +603,7 @@
                         callbacks: {
                             afterBody: function(context) {
                                 const label = context[0]?.label;
-                                const event = chartEvents.find(item => item.time === label);
+                                const event = eventPoints.find(item => item.x === label);
                                 return event ? ['Event: ' + event.label] : [];
                             }
                         }
@@ -606,12 +615,15 @@
                             color: 'rgba(255,255,255,0.05)'
                         },
                         ticks: {
-                            color: '#91a5be'
+                            color: '#91a5be',
+                            maxTicksLimit: 12
                         }
                     },
                     yTraffic: {
                         position: 'left',
-                        beginAtZero: true,
+                        beginAtZero: false,
+                        min: trafficBounds.min,
+                        max: trafficBounds.max,
                         grid: {
                             color: 'rgba(255,255,255,0.05)'
                         },
@@ -627,6 +639,8 @@
                     yLatency: {
                         position: 'right',
                         beginAtZero: true,
+                        min: latencyBounds.min,
+                        max: latencyBounds.max,
                         grid: {
                             drawOnChartArea: false
                         },
@@ -646,6 +660,23 @@
                 }
             },
             plugins: [downtimePlugin, eventLabelPlugin]
+        });
+
+        chartCanvas.addEventListener('wheel', (event) => {
+            event.preventDefault();
+
+            if (event.deltaY < 0) {
+                currentWindowPoints = Math.max(12, Math.floor(currentWindowPoints * 0.8));
+            } else {
+                currentWindowPoints = Math.min((dashboardData.combined_series || []).length, Math.ceil(currentWindowPoints * 1.25));
+            }
+
+            renderChart();
+        }, { passive: false });
+
+        chartCanvas.addEventListener('dblclick', () => {
+            currentWindowPoints = LIVE_WINDOW_POINTS;
+            renderChart();
         });
     }
 
@@ -668,22 +699,18 @@
 
             const freshData = await response.json();
             dashboardData = freshData;
+
+            const maxAvailable = (dashboardData.combined_series || []).length;
+            if (currentWindowPoints > maxAvailable && maxAvailable > 0) {
+                currentWindowPoints = maxAvailable;
+            }
+
             renderAll();
         } catch (error) {
             console.error('Dashboard refresh failed', error);
         }
     }
 
-    document.querySelectorAll('.zoom-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            currentWindowPoints = Number(btn.dataset.window);
-            setActiveZoomButton();
-            scheduleAutoReturnToLive();
-            renderChart();
-        });
-    });
-
-    setActiveZoomButton();
     renderAll();
     setInterval(refreshDashboardData, POLL_INTERVAL_MS);
 </script>

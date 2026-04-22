@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 from psycopg2.extras import RealDictCursor
 
@@ -40,7 +41,7 @@ def get_combined_series(cur):
             failed_count AS failed_requests,
             CASE WHEN traffic_count = 0 THEN TRUE ELSE FALSE END AS downtime
         FROM metrics_bucket
-        WHERE bucket_ts >= NOW() - INTERVAL '10 minutes'
+        WHERE bucket_ts >= NOW() - INTERVAL '30 minutes'
         ORDER BY bucket_ts
         """
     )
@@ -91,9 +92,9 @@ def get_chart_events(cur):
             old_value,
             new_value
         FROM events
-        WHERE ts >= NOW() - INTERVAL '10 minutes'
+        WHERE ts >= NOW() - INTERVAL '30 minutes'
         ORDER BY ts DESC
-        LIMIT 20
+        LIMIT 50
         """
     )
     rows = cur.fetchall()
@@ -259,7 +260,7 @@ def fetch_summary():
     avg_latency = recent_metrics["avg_latency_ms"] or 0
 
     return {
-        "generated_at": "live",
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "sensor": {
             "status": "Online",
             "mode": "Passive monitoring",
