@@ -245,23 +245,28 @@ def get_switch_ports() -> List[dict]:
     return ports
 
 def _parse_qbridge_port_map(raw: str) -> Dict[str, dict]:
-    result = {}
+    result: Dict[str, dict] = {}
 
     for line in raw.splitlines():
         line = line.strip()
-        if " = " not in line:
+        if not line or " = " not in line:
             continue
 
         left, right = line.split(" = ", 1)
-        oid_tail = left.split(OID_QBRIDGE_FDB_PORT, 1)[-1].lstrip(".")
-        parts = oid_tail.split(".")
 
-        if len(parts) < 7:
+        numeric_parts = []
+        for token in left.split("."):
+            if token.isdigit():
+                numeric_parts.append(int(token))
+
+        if len(numeric_parts) < 7:
             continue
 
+        tail = numeric_parts[-7:]
+        vlan_id = tail[0]
+        mac_bytes = tail[1:7]
+
         try:
-            vlan_id = int(parts[0])
-            mac_bytes = [int(x) for x in parts[1:7]]
             bridge_port = int(right.split(": ", 1)[1].strip())
         except Exception:
             continue
@@ -275,22 +280,27 @@ def _parse_qbridge_port_map(raw: str) -> Dict[str, dict]:
     return result
 
 def _parse_qbridge_status_map(raw: str) -> Dict[str, int]:
-    result = {}
+    result: Dict[str, int] = {}
 
     for line in raw.splitlines():
         line = line.strip()
-        if " = " not in line:
+        if not line or " = " not in line:
             continue
 
         left, right = line.split(" = ", 1)
-        oid_tail = left.split(OID_QBRIDGE_FDB_STATUS, 1)[-1].lstrip(".")
-        parts = oid_tail.split(".")
 
-        if len(parts) < 7:
+        numeric_parts = []
+        for token in left.split("."):
+            if token.isdigit():
+                numeric_parts.append(int(token))
+
+        if len(numeric_parts) < 7:
             continue
 
+        tail = numeric_parts[-7:]
+        mac_bytes = tail[1:7]
+
         try:
-            mac_bytes = [int(x) for x in parts[1:7]]
             status = int(right.split(": ", 1)[1].strip())
         except Exception:
             continue
@@ -299,5 +309,4 @@ def _parse_qbridge_status_map(raw: str) -> Dict[str, int]:
         result[mac] = status
 
     return result
-
 
