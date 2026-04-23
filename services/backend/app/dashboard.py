@@ -3,7 +3,7 @@ from datetime import datetime
 
 from psycopg2.extras import RealDictCursor
 
-from switch_monitor import get_switch_ports, get_ip_to_port_map
+from switch_monitor import get_switch_ports, get_mac_to_port_map
 
 from db import get_connection
 
