@@ -173,8 +173,26 @@ def _infer_direction(src_port, dst_port, function_code, pdu):
     if function_code & 0x80:
         return "response"
 
-    return None
+    # Fallback for 502 -> 502 traffic
+    if function_code in (1, 2, 3, 4):
+        if len(pdu) >= 1 and len(pdu) == 1 + pdu[0]:
+            return "response"
+        if len(pdu) >= 4:
+            return "request"
 
+    if function_code in (15, 16):
+        if len(pdu) == 4:
+            return "response"
+        if len(pdu) >= 5:
+            byte_count = pdu[4]
+            if len(pdu) == 5 + byte_count:
+                return "request"
+
+    if function_code in (5, 6):
+        if len(pdu) >= 4:
+            return "request_or_response"
+
+    return None
 
 def parse_packet(pkt):
     data = {
