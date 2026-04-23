@@ -16,6 +16,7 @@ OID_IF_OPER_STATUS = "1.3.6.1.2.1.2.2.1.8"
 OID_QBRIDGE_FDB_PORT = "1.3.6.1.2.1.17.7.1.2.2.1.2"
 OID_QBRIDGE_FDB_STATUS = "1.3.6.1.2.1.17.7.1.2.2.1.3"
 OID_BASEPORT_IFINDEX = "1.3.6.1.2.1.17.1.4.1.2"
+
 OID_IP_NET_TO_MEDIA_PHYS = "1.3.6.1.2.1.4.22.1.2"
 
 PHYSICAL_PORT_RE = re.compile(r"eth(\d+)$")
@@ -105,6 +106,57 @@ def _is_physical_port(name: str) -> bool:
     if cleaned in {"lo", "vlan1"}:
         return False
     return bool(PHYSICAL_PORT_RE.search(cleaned))
+
+
+def _parse_ip_net_to_media_phys(raw: str) -> Dict[str, str]:
+    result: Dict[str, str] = {}
+
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line or " = " not in line:
+            continue
+
+        left, right = line.split(" = ", 1)
+        oid_tail = left.split(OID_IP_NET_TO_MEDIA_PHYS, 1)[-1].lstrip(".")
+        parts = oid_tail.split(".")
+
+        if len(parts) < 5:
+            continue
+
+        ip = ".".join(parts[-4:])
+
+        if ": " not in right:
+            continue
+
+        mac_hex = right.split(": ", 1)[1].strip()
+        mac = ":".join(part.lower() for part in mac_hex.split())
+
+        result[ip] = mac
+
+    return result
+
+
+def get_ip_to_port_map() -> Dict[str, dict]:
+    arp_map = _parse_ip_net_to_media_phys(_run_snmpwalk(OID_IP_NET_TO_MEDIA_PHYS))
+    mac_to_port = get_mac_to_port_map()
+
+    ip_to_port: Dict[str, dict] = {}
+
+    for ip, mac in arp_map.items():
+        mapping = mac_to_port.get(mac.lower())
+        if not mapping:
+            continue
+
+        ip_to_port[ip] = {
+            "mac": mac.lower(),
+            "port": mapping["port"],
+            "ifindex": mapping.get("ifindex"),
+            "ifname": mapping.get("ifname"),
+            "vlan_id": mapping.get("vlan_id"),
+            "fdb_status": mapping.get("fdb_status"),
+        }
+
+    return ip_to_port
 
 
 def get_mac_to_port_map() -> Dict[str, dict]:

@@ -3,7 +3,7 @@ from datetime import datetime
 
 from psycopg2.extras import RealDictCursor
 
-from switch_monitor import get_switch_ports, get_mac_to_port_map
+from switch_monitor import get_switch_ports, get_ip_to_port_map
 
 from db import get_connection
 
@@ -254,15 +254,16 @@ def get_master_slave_groups(cur):
 
 
 def enrich_ports_with_devices(ports, devices, connections):
-    device_by_mac = {
-        (device.get("mac") or "").lower(): device
+    ip_to_port = get_ip_to_port_map()
+
+    device_by_ip = {
+        (device.get("ip") or "").split("/")[0]: device
         for device in devices
-        if device.get("mac")
+        if device.get("ip")
     }
 
-    mac_to_port = get_mac_to_port_map()
-
     connection_map = {}
+
     for group in connections:
         master_ip = (group.get("master") or "").split("/")[0]
         connection_map.setdefault(master_ip, {"role_hint": "master", "unit_ids": set()})
@@ -272,6 +273,7 @@ def enrich_ports_with_devices(ports, devices, connections):
             slave_ip = raw_ip.split("/")[0]
             unit_text = slave.get("ip") or ""
             unit_id = None
+
             if "(unit " in unit_text:
                 try:
                     unit_id = int(unit_text.split("(unit ")[1].split(")")[0])
@@ -284,30 +286,22 @@ def enrich_ports_with_devices(ports, devices, connections):
 
     port_index = {port["port"]: port for port in ports}
 
-    for mac, mapping in mac_to_port.items():
-        device = device_by_mac.get(mac.lower())
-        if not device:
-            continue
-
+    for ip, mapping in ip_to_port.items():
         port = port_index.get(mapping["port"])
         if not port:
             continue
 
-        ip = (device.get("ip") or "").split("/")[0]
+        device = device_by_ip.get(ip, {})
         conn_info = connection_map.get(ip, {})
 
         role = device.get("role") or conn_info.get("role_hint") or "unknown"
         unit_ids = sorted(conn_info.get("unit_ids", set()))
-        label = (
-            "PLC" if role == "slave"
-            else "Master" if role == "master"
-            else "Device"
-        )
+        label = "PLC" if role == "slave" else "Master" if role == "master" else "Device"
 
         port["devices"].append(
             {
                 "ip": ip,
-                "mac": device.get("mac"),
+                "mac": mapping.get("mac") or device.get("mac"),
                 "role": role,
                 "label": label,
                 "unit_ids": unit_ids,
@@ -316,7 +310,7 @@ def enrich_ports_with_devices(ports, devices, connections):
                 "ifindex": mapping.get("ifindex"),
             }
         )
-    
+
     for port in ports:
         vlan_ids = sorted({
             device["vlan_id"]
@@ -325,9 +319,24 @@ def enrich_ports_with_devices(ports, devices, connections):
         })
         port["vlans"] = vlan_ids
 
+        mac_groups = {}
+        for device in port.get("devices", []):
+            mac = (device.get("mac") or "").lower()
+            ip = device.get("ip")
+            if not mac or not ip:
+                continue
+            mac_groups.setdefault(mac, []).append(ip)
+
+        duplicate_macs = [
+            {"mac": mac, "ips": sorted(set(ips))}
+            for mac, ips in mac_groups.items()
+            if len(set(ips)) > 1
+        ]
+
+        port["duplicate_macs"] = duplicate_macs
+        port["has_duplicate_mac_alarm"] = bool(duplicate_macs)
 
     return ports
-
 
 def fetch_summary():
     conn = get_connection()
