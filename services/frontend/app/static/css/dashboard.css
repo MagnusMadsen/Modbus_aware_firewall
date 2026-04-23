@@ -691,6 +691,43 @@ th {
     background-clip: padding-box;
 }
 
+.port-devices {
+    margin-top: 14px;
+    display: grid;
+    gap: 10px;
+}
+
+.port-device {
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+}
+
+.port-device-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.port-device p {
+    margin: 4px 0;
+    font-size: 12px;
+    color: var(--muted);
+    word-break: break-word;
+}
+
+.port-devices-empty {
+    margin-top: 14px;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px dashed rgba(255,255,255,0.10);
+    color: var(--muted);
+    font-size: 12px;
+}
+
 @media (max-width: 1100px) {
     .arp-grid,
     .arp-summary {

@@ -146,6 +146,7 @@ def get_switch_ports() -> List[dict]:
                 "speed": _format_speed(speed_raw),
                 "activity": activity,
                 "state": state,
+                "devices": [],
             }
         )
 

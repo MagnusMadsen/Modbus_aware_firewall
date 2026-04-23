@@ -253,6 +253,76 @@ def get_master_slave_groups(cur):
     return list(groups.values())
 
 
+def enrich_ports_with_devices(ports, devices, connections):
+    device_by_mac = {
+        (device.get("mac") or "").lower(): device
+        for device in devices
+        if device.get("mac")
+    }
+
+    # Midlertidig placeholder: ingen fysisk portbinding endnu
+    # Denne del bliver først "rigtig" når du har MAC->port fra Westermo FDB
+    #
+    # Indtil da kan du manuelt mappe kendte MAC'er til portnavne,
+    # eller lade devices være tomme.
+
+    manual_mac_to_port = {
+        # "aa:bb:cc:dd:ee:ff": "Port 3",
+        # "11:22:33:44:55:66": "Port 5",
+    }
+
+    connection_map = {}
+    for group in connections:
+        master_ip = (group.get("master") or "").split("/")[0]
+        connection_map.setdefault(master_ip, {"role_hint": "master", "unit_ids": set()})
+
+        for slave in group.get("slaves", []):
+            raw_ip = (slave.get("ip") or "").split(" ")[0]
+            slave_ip = raw_ip.split("/")[0]
+            unit_text = slave.get("ip") or ""
+            unit_id = None
+            if "(unit " in unit_text:
+                try:
+                    unit_id = int(unit_text.split("(unit ")[1].split(")")[0])
+                except Exception:
+                    unit_id = None
+
+            entry = connection_map.setdefault(slave_ip, {"role_hint": "slave", "unit_ids": set()})
+            if unit_id is not None:
+                entry["unit_ids"].add(unit_id)
+
+    port_index = {port["port"]: port for port in ports}
+
+    for mac, port_name in manual_mac_to_port.items():
+        device = device_by_mac.get(mac.lower())
+        port = port_index.get(port_name)
+        if not device or not port:
+            continue
+
+        ip = (device.get("ip") or "").split("/")[0]
+        conn_info = connection_map.get(ip, {})
+
+        role = device.get("role") or conn_info.get("role_hint") or "unknown"
+        unit_ids = sorted(conn_info.get("unit_ids", set()))
+        label = (
+            "PLC" if role == "slave"
+            else "Master" if role == "master"
+            else "Device"
+        )
+
+        port["devices"].append(
+            {
+                "ip": ip,
+                "mac": device.get("mac"),
+                "role": role,
+                "label": label,
+                "unit_ids": unit_ids,
+            }
+        )
+
+    return ports
+
+
 def fetch_summary():
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -264,6 +334,10 @@ def fetch_summary():
     recent_events = get_recent_events(cur)
     arp_monitor = get_arp_monitor(cur)
     connections = get_master_slave_groups(cur)
+    ports = get_switch_ports()
+    devices = fetch_devices()
+    connections = get_master_slave_groups(cur)
+    ports = enrich_ports_with_devices(ports, devices, connections)
 
     cur.close()
     conn.close()
