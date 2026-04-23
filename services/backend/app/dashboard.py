@@ -3,6 +3,8 @@ from datetime import datetime
 
 from psycopg2.extras import RealDictCursor
 
+from switch_monitor import get_switch_ports
+
 from db import get_connection
 
 CAPTURE_INTERFACE = os.getenv("CAPTURE_INTERFACE", "eth0")
@@ -286,7 +288,7 @@ def fetch_summary():
         "arp_monitor": arp_monitor,
         "connections": connections,
         "device_roles": [],
-        "ports": [],
+        "ports": get_switch_ports(),
         "events": recent_events,
     }
 

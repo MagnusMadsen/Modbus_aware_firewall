@@ -61,6 +61,9 @@ services:
       REDIS_PORT: 6379
       CAPTURE_INTERFACE: eth0
       TZ: Europe/Copenhagen
+      SWITCH_IP: 192.168.61.162
+      SNMP_COMMUNITY: public
+      SNMP_VERSION: 2c
     volumes:
       - ./services/backend:/app
       - ./data/logs/backend:/app/logs
