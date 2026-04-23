@@ -254,7 +254,7 @@ def get_master_slave_groups(cur):
 
 
 def enrich_ports_with_devices(ports, devices, connections):
-    ip_to_port = get_ip_to_port_map()
+    mac_to_port = get_mac_to_port_map()
 
     device_by_ip = {
         (device.get("ip") or "").split("/")[0]: device
@@ -286,14 +286,20 @@ def enrich_ports_with_devices(ports, devices, connections):
 
     port_index = {port["port"]: port for port in ports}
 
-    for ip, mapping in ip_to_port.items():
+    for ip, device in device_by_ip.items():
+        mac = (device.get("mac") or "").lower()
+        if not mac:
+            continue
+
+        mapping = mac_to_port.get(mac)
+        if not mapping:
+            continue
+
         port = port_index.get(mapping["port"])
         if not port:
             continue
 
-        device = device_by_ip.get(ip, {})
         conn_info = connection_map.get(ip, {})
-
         role = device.get("role") or conn_info.get("role_hint") or "unknown"
         unit_ids = sorted(conn_info.get("unit_ids", set()))
         label = "PLC" if role == "slave" else "Master" if role == "master" else "Device"
@@ -301,7 +307,7 @@ def enrich_ports_with_devices(ports, devices, connections):
         port["devices"].append(
             {
                 "ip": ip,
-                "mac": mapping.get("mac") or device.get("mac"),
+                "mac": mac,
                 "role": role,
                 "label": label,
                 "unit_ids": unit_ids,
