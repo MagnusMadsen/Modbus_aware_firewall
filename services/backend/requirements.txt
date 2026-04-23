@@ -1,5 +1,5 @@
 flask
 psycopg2-binary
 redis
-scap
+scapy
 MarkupSafe==2.0.1
