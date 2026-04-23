@@ -173,24 +173,7 @@ def _infer_direction(src_port, dst_port, function_code, pdu):
     if function_code & 0x80:
         return "response"
 
-    if function_code in (1, 2, 3, 4):
-        if len(pdu) >= 1 and len(pdu) == 1 + pdu[0]:
-            return "response"
-        if len(pdu) >= 4:
-            return "request"
-
-    if function_code in (15, 16):
-        if len(pdu) == 4:
-            return "response"
-        if len(pdu) >= 5:
-            byte_count = pdu[4]
-            if len(pdu) == 5 + byte_count:
-                return "request"
-
-    if function_code in (5, 6):
-        return "request"
-
-    return "request"
+    return None
 
 
 def parse_packet(pkt):
@@ -263,12 +246,17 @@ def parse_packet(pkt):
     data["transaction_id"] = mbap["transaction_id"]
     data["unit_id"] = mbap["unit_id"]
     data["function_code"] = base_function_code
-    data["direction"] = _infer_direction(
+    direction = _infer_direction(
         data["src_port"],
         data["dst_port"],
         raw_function_code,
         pdu,
     )
+
+    if direction is None:
+        return data
+
+    data["direction"] = direction
 
     if raw_function_code & 0x80:
         response_fields = _decode_response_fields(raw_function_code, pdu)
