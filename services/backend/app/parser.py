@@ -274,6 +274,13 @@ def parse_packet(pkt):
     if direction is None:
         return data
 
+    # FC 5/6 on 502->502 cannot be distinguished from one packet alone
+    # Treat server-originated packet as response when possible, otherwise request
+    if direction == "request_or_response":
+        if data["src_ip"] == data["dst_ip"]:
+            return data
+        direction = "request"
+
     data["direction"] = direction
 
     if raw_function_code & 0x80:
