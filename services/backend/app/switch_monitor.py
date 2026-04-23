@@ -13,6 +13,10 @@ OID_IF_SPEED = "1.3.6.1.2.1.2.2.1.5"
 OID_IF_ADMIN_STATUS = "1.3.6.1.2.1.2.2.1.7"
 OID_IF_OPER_STATUS = "1.3.6.1.2.1.2.2.1.8"
 
+OID_QBRIDGE_FDB_MAC = "1.3.6.1.2.1.17.7.1.2.2.1.1"
+OID_QBRIDGE_FDB_PORT = "1.3.6.1.2.1.17.7.1.2.2.1.2"
+OID_BASEPORT_IFINDEX = "1.3.6.1.2.1.17.1.4.1.2"
+
 PHYSICAL_PORT_RE = re.compile(r"eth(\d+)$")
 
 
@@ -152,4 +156,93 @@ def get_switch_ports() -> List[dict]:
 
     ports.sort(key=lambda item: int(item["port"].split()[-1]))
     return ports
+
+def _parse_qbridge_port_map(raw: str) -> Dict[str, dict]:
+    result = {}
+
+    for line in raw.splitlines():
+        line = line.strip()
+        if " = " not in line:
+            continue
+
+        left, right = line.split(" = ", 1)
+        oid_tail = left.split(OID_QBRIDGE_FDB_PORT, 1)[-1].lstrip(".")
+        parts = oid_tail.split(".")
+
+        if len(parts) < 7:
+            continue
+
+        try:
+            vlan_id = int(parts[0])
+            mac_bytes = [int(x) for x in parts[1:7]]
+            bridge_port = int(right.split(": ", 1)[1].strip())
+        except Exception:
+            continue
+
+        mac = ":".join(f"{b:02x}" for b in mac_bytes)
+        result[mac] = {
+            "vlan_id": vlan_id,
+            "bridge_port": bridge_port,
+        }
+
+    return result
+
+def _parse_qbridge_status_map(raw: str) -> Dict[str, int]:
+    result = {}
+
+    for line in raw.splitlines():
+        line = line.strip()
+        if " = " not in line:
+            continue
+
+        left, right = line.split(" = ", 1)
+        oid_tail = left.split(OID_QBRIDGE_FDB_STATUS, 1)[-1].lstrip(".")
+        parts = oid_tail.split(".")
+
+        if len(parts) < 7:
+            continue
+
+        try:
+            mac_bytes = [int(x) for x in parts[1:7]]
+            status = int(right.split(": ", 1)[1].strip())
+        except Exception:
+            continue
+
+        mac = ":".join(f"{b:02x}" for b in mac_bytes)
+        result[mac] = status
+
+    return result
+
+def get_mac_to_port_map() -> Dict[str, dict]:
+    names = _parse_snmp_output(_run_snmpwalk(OID_IF_NAME))
+    baseport_ifindex = _parse_snmp_output(_run_snmpwalk(OID_BASEPORT_IFINDEX))
+    qbridge_ports = _parse_qbridge_port_map(_run_snmpwalk(OID_QBRIDGE_FDB_PORT))
+    qbridge_status = _parse_qbridge_status_map(_run_snmpwalk(OID_QBRIDGE_FDB_STATUS))
+
+    mac_to_port = {}
+
+    for mac, entry in qbridge_ports.items():
+        bridge_port = entry["bridge_port"]
+        ifindex_raw = baseport_ifindex.get(bridge_port)
+        if ifindex_raw is None:
+            continue
+
+        try:
+            ifindex = int(ifindex_raw)
+        except Exception:
+            continue
+
+        if_name = (names.get(ifindex) or "").strip()
+        if not _is_physical_port(if_name):
+            continue
+
+        mac_to_port[mac] = {
+            "port": f"Port {_extract_port_number(if_name)}",
+            "ifindex": ifindex,
+            "ifname": if_name,
+            "vlan_id": entry["vlan_id"],
+            "fdb_status": qbridge_status.get(mac),
+        }
+
+    return mac_to_port
 

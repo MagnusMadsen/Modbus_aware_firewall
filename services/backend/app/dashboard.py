@@ -3,7 +3,7 @@ from datetime import datetime
 
 from psycopg2.extras import RealDictCursor
 
-from switch_monitor import get_switch_ports
+from switch_monitor import get_switch_ports, get_mac_to_port_map
 
 from db import get_connection
 
@@ -260,16 +260,6 @@ def enrich_ports_with_devices(ports, devices, connections):
         if device.get("mac")
     }
 
-    # Midlertidig placeholder: ingen fysisk portbinding endnu
-    # Denne del bliver først "rigtig" når du har MAC->port fra Westermo FDB
-    #
-    # Indtil da kan du manuelt mappe kendte MAC'er til portnavne,
-    # eller lade devices være tomme.
-
-    manual_mac_to_port = {
-        # "aa:bb:cc:dd:ee:ff": "Port 3",
-        # "11:22:33:44:55:66": "Port 5",
-    }
 
     connection_map = {}
     for group in connections:
