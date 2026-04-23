@@ -260,6 +260,7 @@ def enrich_ports_with_devices(ports, devices, connections):
         if device.get("mac")
     }
 
+    mac_to_port = get_mac_to_port_map()
 
     connection_map = {}
     for group in connections:
@@ -283,10 +284,13 @@ def enrich_ports_with_devices(ports, devices, connections):
 
     port_index = {port["port"]: port for port in ports}
 
-    for mac, port_name in manual_mac_to_port.items():
+    for mac, mapping in mac_to_port.items():
         device = device_by_mac.get(mac.lower())
-        port = port_index.get(port_name)
-        if not device or not port:
+        if not device:
+            continue
+
+        port = port_index.get(mapping["port"])
+        if not port:
             continue
 
         ip = (device.get("ip") or "").split("/")[0]
@@ -307,8 +311,20 @@ def enrich_ports_with_devices(ports, devices, connections):
                 "role": role,
                 "label": label,
                 "unit_ids": unit_ids,
+                "vlan_id": mapping.get("vlan_id"),
+                "ifname": mapping.get("ifname"),
+                "ifindex": mapping.get("ifindex"),
             }
         )
+    
+    for port in ports:
+        vlan_ids = sorted({
+            device["vlan_id"]
+            for device in port.get("devices", [])
+            if device.get("vlan_id") is not None
+        })
+        port["vlans"] = vlan_ids
+
 
     return ports
 
