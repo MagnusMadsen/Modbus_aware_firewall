@@ -336,7 +336,6 @@ def fetch_summary():
     connections = get_master_slave_groups(cur)
     ports = get_switch_ports()
     devices = fetch_devices()
-    connections = get_master_slave_groups(cur)
     ports = enrich_ports_with_devices(ports, devices, connections)
 
     cur.close()
@@ -362,7 +361,7 @@ def fetch_summary():
         "arp_monitor": arp_monitor,
         "connections": connections,
         "device_roles": [],
-        "ports": get_switch_ports(),
+        "ports": ports,
         "events": recent_events,
     }
 
