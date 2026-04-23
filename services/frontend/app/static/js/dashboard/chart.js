@@ -92,7 +92,7 @@ export function centerViewOnIndex(index, preferredWindowSize = null) {
 function bindChartInteractions(chartCanvas, rerender) {
     const state = getState();
 
-    chartCanvas.addEventListener("wheel", (event) => {
+    chartCanvas.onwheel = (event) => {
         event.preventDefault();
 
         const series = getSeries();
@@ -128,42 +128,49 @@ function bindChartInteractions(chartCanvas, rerender) {
         }
 
         rerender();
-    }, { passive: false });
+    };
 
-    chartCanvas.addEventListener("dblclick", () => {
+    chartCanvas.ondblclick = () => {
         resetToLiveWindow();
         rerender();
-    });
+    };
 
-    chartCanvas.addEventListener("mousedown", (event) => {
+    chartCanvas.onmousedown = (event) => {
         state.isDragging = true;
         state.dragStartX = event.clientX;
         state.dragStartStartIndex = state.viewStartIndex;
         state.dragStartEndIndex = state.viewEndIndex;
-    });
+    };
 
-    window.addEventListener("mousemove", (event) => {
-        if (!state.isDragging) return;
+    if (!window.__dashboardChartMousemoveBound) {
+        window.__dashboardChartMousemoveBound = true;
 
-        const series = getSeries();
-        const total = series.length;
-        const currentSize = state.dragStartEndIndex - state.dragStartStartIndex;
-        if (!currentSize || !total) return;
+        window.addEventListener("mousemove", (event) => {
+            const state = getState();
+            if (!state.isDragging) return;
 
-        const rect = chartCanvas.getBoundingClientRect();
-        const pixelsPerPoint = rect.width / currentSize;
-        const deltaX = event.clientX - state.dragStartX;
-        const pointShift = Math.round(deltaX / pixelsPerPoint);
+            const chartCanvas = document.getElementById("trafficLatencyChart");
+            if (!chartCanvas) return;
 
-        state.viewStartIndex = Math.max(0, Math.min(total - currentSize, state.dragStartStartIndex - pointShift));
-        state.viewEndIndex = state.viewStartIndex + currentSize;
+            const series = getSeries();
+            const total = series.length;
+            const currentSize = state.dragStartEndIndex - state.dragStartStartIndex;
+            if (!currentSize || !total) return;
 
-        rerender();
-    });
+            const rect = chartCanvas.getBoundingClientRect();
+            const pixelsPerPoint = rect.width / currentSize;
+            const deltaX = event.clientX - state.dragStartX;
+            const pointShift = Math.round(deltaX / pixelsPerPoint);
 
-    window.addEventListener("mouseup", () => {
-        state.isDragging = false;
-    });
+            state.viewStartIndex = Math.max(0, Math.min(total - currentSize, state.dragStartStartIndex - pointShift));
+            state.viewEndIndex = state.viewStartIndex + currentSize;
+        });
+
+        window.addEventListener("mouseup", () => {
+            const state = getState();
+            state.isDragging = false;
+        });
+    }
 }
 
 export function renderChart(chartShell, dashboardData, rerender) {

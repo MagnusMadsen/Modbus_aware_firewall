@@ -13,7 +13,7 @@ import { renderArp } from "./arp.js";
 import { renderPorts } from "./ports.js";
 import { renderChart, findClosestSeriesIndexByTime, centerViewOnIndex } from "./chart.js";
 
-const POLL_INTERVAL_MS = 5000;
+const POLL_INTERVAL_MS = 10000;
 
 const elements = {
     chartShell: document.querySelector(".chart-shell"),
