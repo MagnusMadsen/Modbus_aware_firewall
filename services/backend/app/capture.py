@@ -13,7 +13,7 @@ CAPTURE_INTERFACE = os.getenv("CAPTURE_INTERFACE", "eth0")
 CAPTURE_FILTER = os.getenv("CAPTURE_FILTER", "arp or tcp port 502")
 
 SWITCH_INTERFACE = os.getenv("SWITCH_INTERFACE", "")
-SWITCH_INTERFACE_IP = os.getenv("SWITCH_INTERFACE_IP", "192.168.61.200/24") 
+SWITCH_INTERFACE_IP = os.getenv("SWITCH_INTERFACE_IP", "192.168.61.250/24") 
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
