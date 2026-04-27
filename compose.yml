@@ -103,9 +103,21 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     secrets:
-      - frontend_secret_key
-      - frontend_password_hash
-      - backend_api_token
+      - source: frontend_secret_key
+        target: frontend_secret_key
+        uid: "10001"
+        gid: "10001"
+        mode: 0400
+      - source: frontend_password_hash
+        target: frontend_password_hash
+        uid: "10001"
+        gid: "10001"
+        mode: 0400
+      - source: backend_api_token
+        target: backend_api_token
+        uid: "10001"
+        gid: "10001"
+        mode: 0400
     networks:
       - modbus_net
     ports:
