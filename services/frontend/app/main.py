@@ -35,7 +35,13 @@ if not USERNAME:
     raise RuntimeError("APP_USERNAME is not set")
 
 PASSWORD_HASH = read_secret("frontend_password_hash")
+BACKEND_API_TOKEN = read_secret("backend_api_token")
 API_BASE_URL = os.getenv("API_BASE_URL", "http://host.docker.internal:8000")
+
+def backend_headers() -> dict:
+    return {
+        "X-API-Token": BACKEND_API_TOKEN
+    }
 
 
 def login_required(view_func):
@@ -79,11 +85,19 @@ def get_dashboard_data():
     }
 
     try:
-        dashboard_resp = requests.get(f"{API_BASE_URL}/api/dashboard", timeout=5)
+        dashboard_resp = requests.get(
+                f"{API_BASE_URL}/api/dashboard",
+                headers=backend_headers(),
+                timeout=5,
+            )
         dashboard_resp.raise_for_status()
         dashboard_json = dashboard_resp.json()
 
-        devices_resp = requests.get(f"{API_BASE_URL}/api/devices", timeout=5)
+        devices_resp = requests.get(
+                f"{API_BASE_URL}/api/devices",
+                headers=backend_headers(),
+                timeout=5,
+            )
         devices_resp.raise_for_status()
         devices_json = devices_resp.json()
 
