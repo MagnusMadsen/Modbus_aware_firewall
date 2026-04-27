@@ -12,6 +12,9 @@ from state_manager import process_observation
 CAPTURE_INTERFACE = os.getenv("CAPTURE_INTERFACE", "eth0")
 CAPTURE_FILTER = os.getenv("CAPTURE_FILTER", "arp or tcp port 502")
 
+SWITCH_INTERFACE = os.getenv("SWITCH_INTERFACE", "")
+SWITCH_INTERFACE_IP = os.getenv("SWITCH_INTERFACE_IP", "192.168.61.200/24") 
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
@@ -27,6 +30,7 @@ def handle_packet(pkt):
 
 
 def run_capture():
+    setup_switch_interface()
     start_capture(CAPTURE_INTERFACE)
 
 
@@ -40,7 +44,35 @@ def setup_interface(interface: str) -> None:
     subprocess.run(["ip", "link", "set", interface, "up"], check=False)
     subprocess.run(["ip", "link", "set", interface, "promisc", "on"], check=False)
     logger.info("Interface ready: %s", interface)
+    
+def setup_switch_interface() -> None:
+    if not SWITCH_INTERFACE:
+        logger.info("No switch interface configured")
+        return
 
+    logger.info("Setting up switch interface: %s", SWITCH_INTERFACE)
+
+    subprocess.run(
+        ["ip", "link", "set", SWITCH_INTERFACE, "up"],
+        check=False,
+    )
+
+    result = subprocess.run(
+        ["ip", "addr", "add", SWITCH_INTERFACE_IP, "dev", SWITCH_INTERFACE],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0 and "File exists" not in result.stderr:
+        logger.warning(
+            "Could not add IP %s to %s: %s",
+            SWITCH_INTERFACE_IP,
+            SWITCH_INTERFACE,
+            result.stderr.strip(),
+        )
+
+    logger.info("Switch interface ready: %s %s", SWITCH_INTERFACE, SWITCH_INTERFACE_IP)
 
 def start_capture(interface: str) -> None:
     setup_interface(interface)
