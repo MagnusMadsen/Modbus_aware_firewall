@@ -60,6 +60,8 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       CAPTURE_INTERFACE: eth0
+      SWITCH_INTERFACE: enxac7f3ee618a6
+      SWITCH_INTERFACE_IP: 192.168.61.250/24
       TZ: Europe/Copenhagen
       SWITCH_IP: 192.168.61.162
       SNMP_COMMUNITY: public
