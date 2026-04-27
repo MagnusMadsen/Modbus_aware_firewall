@@ -67,7 +67,7 @@ services:
       SWITCH_INTERFACE_IP: 192.168.61.250/24
       TZ: Europe/Copenhagen
       SWITCH_IP: 192.168.61.162
-      SNMP_COMMUNITY: public
+      SNMP_COMMUNITY_FILE: /run/secrets/snmp_community
       SNMP_VERSION: 2c
     volumes:
       - ./services/backend:/app
@@ -84,6 +84,7 @@ services:
     secrets:
       - postgres_password
       - backend_api_token
+      - snmp_community
 
   frontend:
     build:
@@ -129,3 +130,5 @@ secrets:
     file: ./secrets/postgres_password.txt
   backend_api_token:
     file: ./secrets/backend_api_token.txt
+  snmp_community:
+    file: ./secrets/snmp_community.txt
