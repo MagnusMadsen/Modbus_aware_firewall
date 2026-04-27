@@ -1,5 +1,5 @@
-flask
-psycopg2-binary
-redis
-scapy
-MarkupSafe==2.0.1
+Flask==3.0.3
+psycopg2-binary==2.9.9
+redis==5.0.8
+scapy==2.5.0
+MarkupSafe==2.1.5

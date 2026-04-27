@@ -1,5 +1,4 @@
-flask
-psycopg2-binary
-redis
-requests
-Flask-limiter
+Flask==3.0.3
+requests==2.32.3
+Flask-Limiter==3.8.0
+MarkupSafe==2.1.5
