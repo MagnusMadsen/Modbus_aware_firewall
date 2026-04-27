@@ -1,4 +1,10 @@
+
+
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
 from datetime import datetime, timedelta
 from functools import wraps
 from werkzeug.security import check_password_hash
@@ -21,6 +27,12 @@ def read_secret(secret_name: str) -> str:
 
 
 app = Flask(__name__)
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[],
+)
 
 app.secret_key = read_secret("frontend_secret_key")
 app.config.update(
@@ -124,6 +136,7 @@ def get_dashboard_data():
 
 
 @app.route("/login", methods=["GET", "POST"])
+@limiter.limit("3 per minute")
 def login():
     if session.get("authenticated"):
         return redirect(url_for("index"))
