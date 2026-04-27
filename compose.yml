@@ -58,7 +58,7 @@ services:
       DB_PORT: 5432
       DB_NAME: modbus_fw
       DB_USER: admin
-      DB_PASSWORD: Admin1234!
+      DB_PASSWORD_FILE: /run/secrets/postgres_password
       REDIS_HOST: redis
       REDIS_PORT: 6379
       CAPTURE_INTERFACE: eth0
@@ -80,6 +80,8 @@ services:
       - NET_RAW
     security_opt:
       - no-new-privileges:true
+    secrets:
+      - postgres_password
 
   frontend:
     build:
