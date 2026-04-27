@@ -1,11 +1,27 @@
 import os 
 import re
 import subprocess
+from pathlib import Path
 
 from typing import Dict, List
 
+def read_secret_env(name: str, default: str | None = None) -> str:
+    file_path = os.getenv(f"{name}_FILE")
+
+    if file_path:
+        return Path(file_path).read_text(encoding="utf-8").strip()
+
+    value = os.getenv(name)
+    if value:
+        return value
+
+    if default is not None:
+        return default
+
+    raise RuntimeError(f"Missing required secret or environment variable: {name}")
+
 SWITCH_IP = os.getenv("SWITCH_IP","192.168.61.162")
-SNMP_COMMUNITY = os.getenv("SNMP_COMMUNITY", "public")
+SNMP_COMMUNITY = read_secret_env("SNMP_COMMUNITY")
 SNMP_VERSION = os.getenv("SNMP_VERSION", "2c")
 
 OID_IF_NAME = "1.3.6.1.2.1.2.2.1.2"
