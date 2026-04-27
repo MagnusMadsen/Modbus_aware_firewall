@@ -100,6 +100,8 @@ services:
       TZ: Europe/Copenhagen
       APP_USERNAME: admin
       BACKEND_API_TOKEN_FILE: /run/secrets/backend_api_token
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     extra_hosts:
       - "host.docker.internal:host-gateway"
     secrets:

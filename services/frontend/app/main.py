@@ -28,10 +28,14 @@ def read_secret(secret_name: str) -> str:
 
 app = Flask(__name__)
 
+REDIS_HOST = os.getenv("REDIS_HOST", "redis")
+REDIS_PORT = os.getenv("REDIS_PORT", "6379")
+
 limiter = Limiter(
     get_remote_address,
     app=app,
     default_limits=[],
+    storage_uri=f"redis://{REDIS_HOST}:{REDIS_PORT}/0",
 )
 
 app.secret_key = read_secret("frontend_secret_key")
