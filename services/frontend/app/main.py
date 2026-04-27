@@ -38,7 +38,7 @@ app.secret_key = read_secret("frontend_secret_key")
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
-    SESSION_COOKIE_SECURE=False,
+    SESSION_COOKIE_SECURE=os.getenv("APP_ENV") == "production",
     PERMANENT_SESSION_LIFETIME=timedelta(hours=1),
 )
 
