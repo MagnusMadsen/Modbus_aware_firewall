@@ -5,6 +5,12 @@ WORKDIR /app
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
+RUN useradd -r -u 10001 appuser
+
 COPY . /app
 
-CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]
+RUN chown -R appuser:appuser /app
+
+USER appuser
+
+CMD ["python", "app/main.py"]
