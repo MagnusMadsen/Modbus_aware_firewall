@@ -129,7 +129,7 @@ services:
       - ./services/frontend:/app
       - ./data/logs/frontend:/app/logs
     working_dir: /app
-    command: python app/main.py
+    command: gunicorn -b 0.0.0.0:5000 --workers 2 --threads 4 --timeout 30 app.main:app
 
 networks:
   modbus_net:
