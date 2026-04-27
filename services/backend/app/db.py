@@ -1,6 +1,22 @@
 import os
+from pathlib import Path
 
 import psycopg2
+
+def read_secret_env(name: str, default: str | None = None) -> str:
+    file_path = os.getenv(f"{name}_FILE")
+
+    if file_path:
+        return Path(file_path).read_text(encoding="utf-8").strip()
+
+    value = os.getenv(name)
+    if value:
+        return value
+
+    if default is not None:
+        return default
+
+    raise RuntimeError(f"Missing required secret or environment variable: {name}")
 
 
 def get_connection():
@@ -9,7 +25,7 @@ def get_connection():
         port=os.getenv("DB_PORT", "5432"),
         dbname=os.getenv("DB_NAME", "modbus_fw"),
         user=os.getenv("DB_USER", "admin"),
-        password=os.getenv("DB_PASSWORD", "Admin1234!"),
+        password=read_secret_env("DB_PASSWORD"),
     )
 
 
