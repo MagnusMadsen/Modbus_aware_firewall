@@ -59,6 +59,7 @@ services:
       DB_NAME: modbus_fw
       DB_USER: admin
       DB_PASSWORD_FILE: /run/secrets/postgres_password
+      BACKEND_API_TOKEN_FILE: /run/secrets/backend_api_token
       REDIS_HOST: redis
       REDIS_PORT: 6379
       CAPTURE_INTERFACE: eth0
@@ -82,6 +83,7 @@ services:
       - no-new-privileges:true
     secrets:
       - postgres_password
+      - backend_api_token
 
   frontend:
     build:
@@ -96,11 +98,13 @@ services:
       APP_ENV: development
       TZ: Europe/Copenhagen
       APP_USERNAME: admin
+      BACKEND_API_TOKEN_FILE: /run/secrets/backend_api_token
     extra_hosts:
       - "host.docker.internal:host-gateway"
     secrets:
       - frontend_secret_key
       - frontend_password_hash
+      - backend_api_token
     networks:
       - modbus_net
     ports:
@@ -123,3 +127,5 @@ secrets:
     file: ./secrets/frontend_password_hash.txt
   postgres_password:
     file: ./secrets/postgres_password.txt
+  backend_api_token:
+    file: ./secrets/backend_api_token.txt
