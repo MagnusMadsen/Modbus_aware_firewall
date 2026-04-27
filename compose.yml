@@ -14,7 +14,7 @@ services:
       - ./data/postgres:/var/lib/postgresql/data
       - ./services/db/init:/docker-entrypoint-initdb.d
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     networks:
       - modbus_net
     healthcheck:
@@ -31,7 +31,7 @@ services:
     volumes:
       - ./data/redis:/data
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     networks:
       - modbus_net
     healthcheck:
