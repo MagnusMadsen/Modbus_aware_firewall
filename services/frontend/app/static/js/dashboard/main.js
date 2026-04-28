@@ -12,6 +12,7 @@ import { renderEvents } from "./events.js";
 import { renderArp } from "./arp.js";
 import { renderPorts } from "./ports.js";
 import { renderChart, findClosestSeriesIndexByTime, centerViewOnIndex } from "./chart.js";
+import { renderApprovalModal } from "./approvalModal.js";
 
 const POLL_INTERVAL_MS = 10000;
 
@@ -63,6 +64,8 @@ function renderAll() {
     renderArp(elements.arp, dashboardData);
     renderPorts(elements.portsGrid, dashboardData);
     renderChart(elements.chartShell, dashboardData, renderAll);
+
+    renderApprovalModal(dashboardData, refreshDashboardData);
 }
 
 async function refreshDashboardData() {

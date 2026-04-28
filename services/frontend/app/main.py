@@ -183,5 +183,35 @@ def live_dashboard():
     return jsonify(get_dashboard_data())
 
 
+@app.post("/api/devices/<int:device_id>/approve")
+@login_required
+def approve_device(device_id):
+    return proxy_device_action(device_id, "approve")
+
+
+@app.post("/api/devices/<int:device_id>/block")
+@login_required
+def block_device(device_id):
+    return proxy_device_action(device_id, "block")
+
+
+@app.post("/api/devices/<int:device_id>/ignore")
+@login_required
+def ignore_device(device_id):
+    return proxy_device_action(device_id, "ignore")
+
+
+def proxy_device_action(device_id: int, action: str):
+    try:
+        response = requests.post(
+            f"{API_BASE_URL}/api/devices/{device_id}/{action}",
+            headers=backend_headers(),
+            timeout=5,
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 502
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
