@@ -886,6 +886,12 @@ th {
     color: var(--muted);
 }
 
+.approval-log-section {
+    margin-top: 22px;
+    margin-bottom: 22px;
+}
+
+
 @media (max-width: 900px) {
     .approval-log-item {
         grid-template-columns: 1fr;
