@@ -1,12 +1,12 @@
-import hmac
-import os
+
 import ipaddress
-from pathlib import Path
+import hmac
+
+from config import read_secret_env
 from db import get_connection
-
 from flask import Blueprint, jsonify, request
-
 from dashboard import fetch_summary, fetch_devices
+
 from storage import (
     list_critical_registers,
     save_critical_register,
@@ -14,19 +14,6 @@ from storage import (
 )
 
 api_bp = Blueprint("api", __name__)
-
-def read_secret_env(name: str) -> str:
-    file_path = os.getenv(f"{name}_FILE")
-
-    if file_path:
-        value = Path(file_path).read_text(encoding="utf-8").strip()
-    else:
-        value = os.getenv(name, "").strip()
-
-    if not value:
-        raise RuntimeError(f"Missing required secret or environment variable: {name}")
-
-    return value
 
 
 BACKEND_API_TOKEN = read_secret_env("BACKEND_API_TOKEN")

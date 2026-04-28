@@ -1,5 +1,7 @@
+
 import os
-from pathlib import Path
+
+from config import read_secret_env
 
 import psycopg2
 
