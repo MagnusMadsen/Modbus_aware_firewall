@@ -14,7 +14,7 @@ services:
       - ./data/postgres:/var/lib/postgresql/data
       - ./services/db/init:/docker-entrypoint-initdb.d
     ports:
-      - "${FRONTEND_PORT}:5000"
+      - "127.0.0.1:5432:5432"
     networks:
       - modbus_net
     healthcheck:
@@ -123,7 +123,7 @@ services:
     networks:
       - modbus_net
     ports:
-      - "5000:5000"
+      - "${FRONTEND_PORT}:5000"
     restart: unless-stopped
     volumes:
       - ./services/frontend:/app
