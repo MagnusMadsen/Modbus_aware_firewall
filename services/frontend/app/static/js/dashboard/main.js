@@ -13,6 +13,7 @@ import { renderArp } from "./arp.js";
 import { renderPorts } from "./ports.js";
 import { renderChart, findClosestSeriesIndexByTime, centerViewOnIndex } from "./chart.js";
 import { renderApprovalModal } from "./approvalModal.js";
+import { renderApprovalLog } from "./approvalLog.js";
 
 const POLL_INTERVAL_MS = 10000;
 
@@ -36,6 +37,8 @@ const elements = {
     sensorInterface: document.getElementById("sensor-interface"),
     sensorPill: document.getElementById("sensor-pill"),
     combinedNote: document.getElementById("combined-note"),
+
+    approvalLogList: document.getElementById("approval-log-list"),
 };
 
 function renderHeader(dashboardData) {
@@ -66,6 +69,7 @@ function renderAll() {
     renderChart(elements.chartShell, dashboardData, renderAll);
 
     renderApprovalModal(dashboardData, refreshDashboardData);
+    renderApprovalLog(elements.approvalLogList);
 }
 
 async function refreshDashboardData() {

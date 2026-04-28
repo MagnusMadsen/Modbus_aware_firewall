@@ -1,4 +1,5 @@
 import { approveDevice, blockDevice, ignoreDevice } from "./api.js";
+import { saveApprovalLogEntry } from "./approvalLog.js";
 
 let activeAlertKey = null;
 
@@ -67,6 +68,8 @@ export function renderApprovalModal(dashboardData, onHandled) {
 }
 
 async function handleAlert(alert, action) {
+    saveApprovalLogEntry(alert, action);
+
     if (alert.type === "device" && alert.deviceId) {
         if (action === "approve") await approveDevice(alert.deviceId);
         if (action === "block") await blockDevice(alert.deviceId);
