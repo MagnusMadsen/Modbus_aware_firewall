@@ -1,5 +1,6 @@
 import { approveDevice, blockDevice, ignoreDevice } from "./api.js";
 import { saveApprovalLogEntry } from "./approvalLog.js";
+import { escapeHtml } from "./utils/html.js";
 
 let activeAlertKey = null;
 
