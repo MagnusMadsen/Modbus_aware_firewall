@@ -1,36 +1,9 @@
 
+import { getApprovalLogEntries } from "./alertStore.js";
 import { escapeHtml } from "./utils/html.js";
 
 const APPROVAL_LOG_KEY = "approval-log";
 
-export function saveApprovalLogEntry(alert, action) {
-    const entries = getApprovalLogEntries();
-
-    const status = mapActionToStatus(action);
-
-    const entry = {
-        id: `${alert.key}:${Date.now()}`,
-        alertKey: alert.key,
-        type: alert.type,
-        title: alert.title,
-        message: alert.message,
-        status,
-        action,
-        details: alert.details || [],
-        handledAt: new Date().toLocaleString(),
-    };
-
-    const updated = [entry, ...entries].slice(0, 50);
-    localStorage.setItem(APPROVAL_LOG_KEY, JSON.stringify(updated));
-}
-
-export function getApprovalLogEntries() {
-    try {
-        return JSON.parse(localStorage.getItem(APPROVAL_LOG_KEY) || "[]");
-    } catch {
-        return [];
-    }
-}
 
 export function renderApprovalLog(container) {
     if (!container) return;
@@ -77,13 +50,5 @@ export function renderApprovalLog(container) {
             </div>
         `;
     }).join("");
-}
-
-function mapActionToStatus(action) {
-    if (action === "approve") return "approved";
-    if (action === "block") return "blocked";
-    if (action === "ignore") return "ignored";
-    if (action === "critical") return "critical";
-    return "handled";
 }
 

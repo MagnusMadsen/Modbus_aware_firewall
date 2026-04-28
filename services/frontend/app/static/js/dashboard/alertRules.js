@@ -1,3 +1,6 @@
+
+import { isAlertAcknowledged } from "./alertStore.js";
+
 export function findNextAlert(dashboardData) {
     return (
         findPendingDeviceAlert(dashboardData) ||
@@ -9,9 +12,6 @@ export function findNextAlert(dashboardData) {
     );
 }
 
-function isAcknowledged(key) {
-    return Boolean(localStorage.getItem(`ack:${key}`));
-}
 
 function findPendingDeviceAlert(dashboardData) {
     const devices = dashboardData.devices || [];
@@ -23,7 +23,7 @@ function findPendingDeviceAlert(dashboardData) {
     if (!device) return null;
 
     const key = `device:${device.id || device.ip || device.mac}`;
-    if (isAcknowledged(key)) return null;
+    if (isAlertAcknowledged(key)) return null;
 
     return {
         type: "device",
@@ -50,7 +50,7 @@ function findArpAlert(dashboardData) {
     if (!event) return null;
 
     const key = `arp:${event.time}:${event.details}`;
-    if (isAcknowledged(key)) return null;
+    if (isAlertAcknowledged(key)) return null;
 
     return {
         type: "arp",
@@ -76,7 +76,7 @@ function findDowntimeAlert(dashboardData) {
     if (!lastDowntime) return null;
 
     const key = `downtime:${lastDowntime.time}`;
-    if (isAcknowledged(key)) return null;
+    if (isAlertAcknowledged(key)) return null;
 
     return {
         type: "downtime",
@@ -102,7 +102,7 @@ function findFailedRequestAlert(dashboardData) {
     if (!lastFailed) return null;
 
     const key = `failed:${lastFailed.time}:${lastFailed.failed_requests}`;
-    if (isAcknowledged(key)) return null;
+    if (isAlertAcknowledged(key)) return null;
 
     return {
         type: "failed_requests",
@@ -132,7 +132,7 @@ function findLatencyAlert(dashboardData) {
     if (!spike) return null;
 
     const key = `latency:${spike.time}:${spike.latency}`;
-    if (isAcknowledged(key)) return null;
+    if (isAlertAcknowledged(key)) return null;
 
     return {
         type: "latency",
@@ -156,7 +156,7 @@ function findActivePortAlert(dashboardData) {
     const activePort = ports.find((port) => {
         const state = String(port.state || "").toLowerCase();
         const key = `port-active:${port.port}`;
-        return state === "active" && !isAcknowledged(key);
+        return state === "active" && !isAlertAcknowledged(key);
     });
 
     if (!activePort) return null;

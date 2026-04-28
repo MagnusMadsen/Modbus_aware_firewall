@@ -1,5 +1,5 @@
 import { approveDevice, blockDevice, ignoreDevice } from "./api.js";
-import { saveApprovalLogEntry } from "./approvalLog.js";
+import { acknowledgeAlert, saveApprovalLogEntry } from "./alertStore.js";
 import { escapeHtml } from "./utils/html.js";
 import { findNextAlert } from "./alertRules.js";
 
@@ -79,7 +79,7 @@ async function handleAlert(alert, action) {
         return;
     }
 
-    localStorage.setItem(`ack:${alert.key}`, new Date().toISOString());
+    acknowledgeAlert(alert.key);
 }
 
 
