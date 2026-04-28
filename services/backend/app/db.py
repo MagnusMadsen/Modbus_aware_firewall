@@ -40,6 +40,7 @@ def init_db():
             ip INET NOT NULL UNIQUE,
             mac TEXT,
             role TEXT,
+            status TEXT NOT NULL DEFAULT 'pending',
             first_seen TIMESTAMP NOT NULL DEFAULT NOW(),
             last_seen TIMESTAMP NOT NULL DEFAULT NOW()
         );
@@ -143,6 +144,7 @@ def init_db():
     cur.execute("CREATE INDEX IF NOT EXISTS idx_register_state_slave ON modbus_register_state (slave_ip, unit_id);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_events_ts ON events (ts DESC);")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_metrics_bucket_ts ON metrics_bucket (bucket_ts DESC);")
+    cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending';")
 
     conn.commit()
     cur.close()

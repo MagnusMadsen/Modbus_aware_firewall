@@ -394,9 +394,11 @@ def fetch_devices():
     cur.execute(
         """
         SELECT
+            id,
             ip::text AS ip,
             mac,
             role,
+            status,
             TO_CHAR(first_seen, 'YYYY-MM-DD HH24:MI:SS') AS first_seen,
             TO_CHAR(last_seen, 'YYYY-MM-DD HH24:MI:SS') AS last_seen
         FROM devices

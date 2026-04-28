@@ -2,6 +2,7 @@ import hmac
 import os
 import ipaddress
 from pathlib import Path
+from db import get_connection
 
 from flask import Blueprint, jsonify, request
 
@@ -157,3 +158,49 @@ def api_delete_critical_register(register_id):
 
     delete_critical_register(register_id)
     return jsonify({"status": "ok"})
+
+@api_bp.route("/api/devices/<int:device_id>/approve", methods=["POST"])
+def api_approve_device(device_id):
+    auth_error = require_api_token()
+    if auth_error:
+        return auth_error
+
+    update_device_status(device_id, "approved")
+    return jsonify({"status": "ok"})
+
+
+@api_bp.route("/api/devices/<int:device_id>/block", methods=["POST"])
+def api_block_device(device_id):
+    auth_error = require_api_token()
+    if auth_error:
+        return auth_error
+
+    update_device_status(device_id, "blocked")
+    return jsonify({"status": "ok"})
+
+
+@api_bp.route("/api/devices/<int:device_id>/ignore", methods=["POST"])
+def api_ignore_device(device_id):
+    auth_error = require_api_token()
+    if auth_error:
+        return auth_error
+
+    update_device_status(device_id, "ignored")
+    return jsonify({"status": "ok"})
+
+
+def update_device_status(device_id: int, status: str):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        UPDATE devices
+        SET status = %s
+        WHERE id = %s
+        """,
+        (status, device_id),
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+
