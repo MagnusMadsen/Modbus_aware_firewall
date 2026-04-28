@@ -5,20 +5,6 @@ from config import read_secret_env
 
 import psycopg2
 
-def read_secret_env(name: str, default: str | None = None) -> str:
-    file_path = os.getenv(f"{name}_FILE")
-
-    if file_path:
-        return Path(file_path).read_text(encoding="utf-8").strip()
-
-    value = os.getenv(name)
-    if value:
-        return value
-
-    if default is not None:
-        return default
-
-    raise RuntimeError(f"Missing required secret or environment variable: {name}")
 
 
 def get_connection():
