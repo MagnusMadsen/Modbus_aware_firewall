@@ -5,8 +5,8 @@ services:
     container_name: modbus_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: modbus_fw
-      POSTGRES_USER: admin
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     secrets:
       - postgres_password
@@ -14,7 +14,7 @@ services:
       - ./data/postgres:/var/lib/postgresql/data
       - ./services/db/init:/docker-entrypoint-initdb.d
     ports:
-      - "127.0.0.1:5432:5432"
+      - "${FRONTEND_PORT}:5000"
     networks:
       - modbus_net
     healthcheck:
@@ -52,23 +52,23 @@ services:
       redis:
         condition: service_healthy
     environment:
-      APP_ENV: development
+      APP_ENV: ${APP_ENV}
       LOG_LEVEL: INFO
       DB_HOST: 127.0.0.1
       DB_PORT: 5432
-      DB_NAME: modbus_fw
-      DB_USER: admin
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
       DB_PASSWORD_FILE: /run/secrets/postgres_password
       BACKEND_API_TOKEN_FILE: /run/secrets/backend_api_token
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      CAPTURE_INTERFACE: eth0
-      SWITCH_INTERFACE: enxac7f3ee618a6
-      SWITCH_INTERFACE_IP: 192.168.61.250/24
-      TZ: Europe/Copenhagen
-      SWITCH_IP: 192.168.61.162
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      CAPTURE_INTERFACE: ${CAPTURE_INTERFACE}
+      SWITCH_INTERFACE: ${SWITCH_INTERFACE}
+      SWITCH_INTERFACE_IP: ${SWITCH_INTERFACE_IP}
+      TZ: ${TZ}
+      SWITCH_IP: ${SWITCH_IP}
       SNMP_COMMUNITY_FILE: /run/secrets/snmp_community
-      SNMP_VERSION: 2c
+      SNMP_VERSION: ${SNMP_VERSION}
     volumes:
       - ./services/backend:/app
       - ./data/logs/backend:/app/logs
@@ -95,13 +95,13 @@ services:
       backend:
         condition: service_started
     environment:
-      API_BASE_URL: http://host.docker.internal:8000
-      APP_ENV: development
-      TZ: Europe/Copenhagen
-      APP_USERNAME: admin
+      API_BASE_URL: ${API_BASE_URL}
+      APP_ENV: ${APP_ENV}
+      TZ: ${TZ}
+      APP_USERNAME: ${APP_USERNAME}
       BACKEND_API_TOKEN_FILE: /run/secrets/backend_api_token
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     secrets:
