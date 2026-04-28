@@ -1,3 +1,6 @@
+
+import { escapeHtml } from "./utils/html.js";
+
 const APPROVAL_LOG_KEY = "approval-log";
 
 export function saveApprovalLogEntry(alert, action) {
@@ -84,11 +87,3 @@ function mapActionToStatus(action) {
     return "handled";
 }
 
-function escapeHtml(value) {
-    return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-}
