@@ -363,6 +363,19 @@ th {
 
 /* Chart */
 
+.chart-toolbar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.chart-toolbar .live-note {
+    color: var(--muted);
+    font-size: 13px;
+}
+
 .chart-shell {
     height: 340px;
     position: relative;
