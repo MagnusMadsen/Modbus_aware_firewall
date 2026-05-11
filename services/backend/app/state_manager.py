@@ -309,14 +309,24 @@ class ModbusStateManager:
             state_key = (slave_ip, unit_id, register_type, address)
             old_value = self.register_state.get(state_key)
 
+            classification = self._classify_register_change(
+                master_ip=data.get("src_ip"),
+                slave_ip=slave_ip,
+                unit_id=unit_id,
+                register_type=register_type,
+                register_address=address,
+                old_value=old_value,
+                new_value=value,
+            )
+
             if old_value is None:
                 self.register_state[state_key] = value
                 self.writer.upsert_register_state(slave_ip, unit_id, register_type, address, value)
 
-                if not self.in_learning_mode():
+                if not self.in_learning_mode() or classification["is_pinned"]:
                     self.writer.insert_event(
                         event_type="new_register_observed",
-                        severity="info",
+                        severity=classification["severity"] if classification["is_pinned"] else "info",
                         source_ip=data.get("src_ip"),
                         target_ip=slave_ip,
                         unit_id=unit_id,
@@ -324,22 +334,18 @@ class ModbusStateManager:
                         register_type=register_type,
                         register_address=address,
                         new_value=value,
-                        details={"message": "New register observed"},
+                        details={
+                            "message": "New register observed",
+                            "is_pinned": classification["is_pinned"],
+                            "pin_reason": classification["pin_reason"],
+                            "critical_label": classification["critical_label"],
+                        },
                     )
                 continue
 
             if old_value != value:
                 self.register_state[state_key] = value
                 self.writer.upsert_register_state(slave_ip, unit_id, register_type, address, value)
-                classification = self._classify_register_change(
-                    master_ip=data.get("src_ip"),
-                    slave_ip=slave_ip,
-                    unit_id=unit_id,
-                    register_type=register_type,
-                    register_address=address,
-                    old_value=old_value,
-                    new_value=value,
-                )
 
                 self.writer.insert_event(
                     event_type="register_value_changed",
