@@ -160,12 +160,21 @@ def get_recent_events(cur):
         details = row["details"] or {}
         message = details.get("message", row["event_type"])
 
+        impact_parts = [message]
+
+        if critical_label:
+            impact_parts.append(f"Critical register: {critical_label}")
+
+        if pin_reason:
+            impact_parts.append(f"Reason: {pin_reason}")
+
         events.append(
             {
                 "type": row["event_type"],
                 "time": row["time"],
+                "severity": row["severity"],
                 "details": " | ".join(parts) if parts else message,
-                "impact": message,
+                "impact": " | ".join(impact_parts),
                 "is_pinned": is_pinned,
                 "pin_reason": pin_reason,
                 "critical_label": critical_label,
