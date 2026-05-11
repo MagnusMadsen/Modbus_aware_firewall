@@ -3,4 +3,4 @@ data/redis/*
 secrets/
 services/backend/app/__pycache__/
 data/postgres/
-.env
+.env.env
