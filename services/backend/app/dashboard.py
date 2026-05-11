@@ -225,6 +225,7 @@ def get_arp_monitor(cur):
     }
 
 
+
 def get_master_slave_groups(cur):
     cur.execute(
         """
