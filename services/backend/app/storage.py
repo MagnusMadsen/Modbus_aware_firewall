@@ -47,6 +47,27 @@ class StorageWriter:
             row = cur.fetchone()
             cur.close()
             return dict(row) if row is not None else None
+        
+    def get_device_by_ip(self, ip):
+        if not ip:
+            return None
+
+        return self._query_one_dict(
+            """
+            SELECT
+                id,
+                ip::text AS ip,
+                mac,
+                role,
+                status,
+                first_seen,
+                last_seen
+            FROM devices
+            WHERE ip = %s
+            LIMIT 1
+            """,
+            (ip,),
+        )
 
     def upsert_device(self, ip, mac=None, role=None):
         if not ip or ip in ("0.0.0.0", "255.255.255.255"):
@@ -183,28 +204,28 @@ class StorageWriter:
         )
 
     def get_critical_register(self, slave_ip, unit_id, register_type, register_address):
-            return self._query_one_dict(
-            """
-            SELECT
-                id,
-                slave_ip::text AS slave_ip,
-                unit_id,
-                register_type,
-                register_address,
-                label,
-                allowed_values,
-                pin_on_change,
-                is_enabled
-            FROM critical_registers
-            WHERE slave_ip = %s
-              AND unit_id = %s
-              AND register_type = %s
-              AND register_address = %s
-              AND is_enabled = TRUE
-            LIMIT 1
-            """,
-            (slave_ip, unit_id, register_type, register_address),
-        )
+        return self._query_one_dict(
+        """
+        SELECT
+            id,
+            slave_ip::text AS slave_ip,
+            unit_id,
+            register_type,
+            register_address,
+            label,
+            allowed_values,
+            pin_on_change,
+            is_enabled
+        FROM critical_registers
+        WHERE slave_ip = %s
+            AND unit_id = %s
+            AND register_type = %s
+            AND register_address = %s
+            AND is_enabled = TRUE
+        LIMIT 1
+        """,
+        (slave_ip, unit_id, register_type, register_address),
+    )
 
     def list_critical_registers(self):
         return self._query_all_dicts(
@@ -299,3 +320,6 @@ def save_critical_register(payload):
 
 def delete_critical_register(register_id):
     return get_writer().delete_critical_register(register_id)
+
+def get_device_by_ip(ip):
+    return get_writer().get_device_by_ip(ip)

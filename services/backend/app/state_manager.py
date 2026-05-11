@@ -129,57 +129,133 @@ class ModbusStateManager:
         self.bucket_ts = current_bucket
         self.metrics = self._new_metrics_bucket()
 
+    def _normalize_mac(self, mac):
+        if not mac:
+            return None
+        return str(mac).strip().lower()
+
+    def _merge_role(self, current_role, new_role):
+        if not new_role:
+            return current_role
+
+        new_role = str(new_role).strip().lower()
+        current_role = str(current_role).strip().lower() if current_role else None
+
+        if new_role == "unknown" and current_role in ("master", "slave"):
+            return current_role
+
+        return new_role
+
     def _touch_device(self, ip, mac=None, role=None):
         if not ip or ip in ("0.0.0.0", "255.255.255.255"):
             return
 
         now = _now()
+        normalized_mac = self._normalize_mac(mac)
+        normalized_role = str(role).strip().lower() if role else None
+
         existing = self.known_devices.get(ip)
 
         if existing is None:
-            self.known_devices[ip] = {
-                "mac": mac,
-                "role": role,
-                "first_seen": now,
-                "last_seen": now,
-            }
-            self.writer.upsert_device(ip, mac, role)
+            db_device = self.writer.get_device_by_ip(ip)
 
-            if not self.in_learning_mode():
-                self.writer.insert_event(
-                    event_type="new_device",
-                    severity="info",
-                    source_ip=ip,
-                    details={"mac": mac, "role": role},
-                )
-            self.device_last_sql_touch[ip] = now
-            return
+            if db_device:
+                existing = {
+                    "mac": self._normalize_mac(db_device.get("mac")),
+                    "role": db_device.get("role"),
+                    "first_seen": db_device.get("first_seen"),
+                    "last_seen": now,
+                }
+                self.known_devices[ip] = existing
+            else:
+                self.known_devices[ip] = {
+                    "mac": normalized_mac,
+                    "role": normalized_role,
+                    "first_seen": now,
+                    "last_seen": now,
+                }
 
-        mac_changed = mac and existing.get("mac") and existing["mac"] != mac
+                self.writer.upsert_device(ip, normalized_mac, normalized_role)
+
+                if not self.in_learning_mode():
+                    self.writer.insert_event(
+                        event_type="new_device",
+                        severity="info",
+                        source_ip=ip,
+                        details={
+                            "message": "New device observed",
+                            "mac": normalized_mac,
+                            "role": normalized_role,
+                        },
+                    )
+
+                self.device_last_sql_touch[ip] = now
+                return
+
+        old_mac = self._normalize_mac(existing.get("mac"))
+        old_role = existing.get("role")
+        merged_role = self._merge_role(old_role, normalized_role)
+
+        mac_changed = bool(normalized_mac and old_mac and old_mac != normalized_mac)
+        role_changed = bool(
+            old_role
+            and merged_role
+            and old_role != merged_role
+            and {old_role, merged_role} == {"master", "slave"}
+        )
+
         if mac_changed:
-            old_mac = existing["mac"]
-            existing["mac"] = mac
             self.writer.insert_event(
-                event_type="arp_mac_changed",
+                event_type="identity_mac_changed",
                 severity="high",
                 source_ip=ip,
                 old_value=old_mac,
-                new_value=mac,
+                new_value=normalized_mac,
                 details={
-                    "reason": "Known IP seen with a different MAC",
+                    "message": "Known IP observed with a different MAC address",
+                    "old_mac": old_mac,
+                    "new_mac": normalized_mac,
+                    "role": merged_role,
                     "is_pinned": True,
-                    "pin_reason": "ARP MAC changed",
+                    "pin_reason": "IP/MAC identity changed",
+                },
+            )
+            existing["mac"] = normalized_mac
+
+        if role_changed:
+            self.writer.insert_event(
+                event_type="identity_role_changed",
+                severity="high",
+                source_ip=ip,
+                old_value=old_role,
+                new_value=merged_role,
+                details={
+                    "message": "Known device changed Modbus role",
+                    "old_role": old_role,
+                    "new_role": merged_role,
+                    "mac": normalized_mac or old_mac,
+                    "is_pinned": True,
+                    "pin_reason": "Device role changed",
                 },
             )
 
-        if role and existing.get("role") != role:
-            existing["role"] = role
-
+        existing["role"] = merged_role
         existing["last_seen"] = now
 
         last_touch = self.device_last_sql_touch.get(ip)
-        if last_touch is None or (now - last_touch).total_seconds() >= DEVICE_SQL_TOUCH_SECONDS or mac_changed:
-            self.writer.upsert_device(ip, existing.get("mac"), existing.get("role"))
+        should_touch_sql = (
+            last_touch is None
+            or (now - last_touch).total_seconds() >= DEVICE_SQL_TOUCH_SECONDS
+            or mac_changed
+            or role_changed
+        )
+
+        if should_touch_sql:
+            self.writer.upsert_device(
+                ip,
+                existing.get("mac"),
+                existing.get("role"),
+            )
             self.device_last_sql_touch[ip] = now
 
     def _touch_connection(self, master_ip, slave_ip, unit_id):
