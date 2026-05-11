@@ -1,4 +1,6 @@
+
 import { fetchDashboardData } from "./api.js";
+
 import {
     getState,
     setDashboardData,
@@ -6,6 +8,7 @@ import {
     resetToLiveWindow,
     syncWindowAfterRefresh,
 } from "./state.js";
+
 import { renderSummary } from "./summary.js";
 import { renderConnections } from "./connections.js";
 import { renderEvents } from "./events.js";
@@ -14,6 +17,12 @@ import { renderPorts } from "./ports.js";
 import { renderChart, findClosestSeriesIndexByTime, centerViewOnIndex } from "./chart.js";
 import { renderApprovalModal } from "./approvalModal.js";
 import { renderApprovalLog } from "./approvalLog.js";
+
+import {
+    openCriticalRegistersModal,
+    renderCriticalRegistersModal,
+} from "./criticalRegisters.js";
+
 
 const POLL_INTERVAL_MS = 10000;
 
@@ -37,6 +46,7 @@ const elements = {
     sensorInterface: document.getElementById("sensor-interface"),
     sensorPill: document.getElementById("sensor-pill"),
     combinedNote: document.getElementById("combined-note"),
+    criticalRegistersOpen: document.getElementById("critical-registers-open"),
 
     approvalLogList: document.getElementById("approval-log-list"),
 };
@@ -70,6 +80,7 @@ function renderAll() {
 
     renderApprovalModal(dashboardData, refreshDashboardData);
     renderApprovalLog(elements.approvalLogList);
+    renderCriticalRegistersModal();
 }
 
 async function refreshDashboardData() {
@@ -84,6 +95,7 @@ async function refreshDashboardData() {
     }
 }
 
+elements.criticalRegistersOpen?.addEventListener("click", openCriticalRegistersModal);
 resetToLiveWindow();
 renderAll();
 setInterval(refreshDashboardData, POLL_INTERVAL_MS);

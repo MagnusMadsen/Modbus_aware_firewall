@@ -34,4 +34,47 @@ async function postDeviceAction(deviceId, action) {
     return response.json();
 }
 
+export async function fetchCriticalRegisters() {
+    const response = await fetch("/api/critical-registers", {
+        cache: "no-store",
+    });
+
+    if (!response.ok) {
+        throw new Error(`Critical registers fetch failed with status ${response.status}`);
+    }
+
+    return response.json();
+}
+
+export async function saveCriticalRegister(payload) {
+    const response = await fetch("/api/critical-registers", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        cache: "no-store",
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(errorBody.error || `Critical register save failed with status ${response.status}`);
+    }
+
+    return response.json();
+}
+
+export async function deleteCriticalRegister(registerId) {
+    const response = await fetch(`/api/critical-registers/${registerId}`, {
+        method: "DELETE",
+        cache: "no-store",
+    });
+
+    if (!response.ok) {
+        throw new Error(`Critical register delete failed with status ${response.status}`);
+    }
+
+    return response.json();
+}
+
 

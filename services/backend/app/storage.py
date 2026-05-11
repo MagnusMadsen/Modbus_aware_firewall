@@ -38,6 +38,15 @@ class StorageWriter:
             rows = cur.fetchall()
             cur.close()
             return rows
+        
+    def _query_one_dict(self, query, params=None):
+        with self._lock:
+            self._ensure_connection()
+            cur = self._conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute(query, params or ())
+            row = cur.fetchone()
+            cur.close()
+            return dict(row) if row is not None else None
 
     def upsert_device(self, ip, mac=None, role=None):
         if not ip or ip in ("0.0.0.0", "255.255.255.255"):
@@ -174,7 +183,7 @@ class StorageWriter:
         )
 
     def get_critical_register(self, slave_ip, unit_id, register_type, register_address):
-        return self._execute(
+            return self._query_one_dict(
             """
             SELECT
                 id,
@@ -195,7 +204,6 @@ class StorageWriter:
             LIMIT 1
             """,
             (slave_ip, unit_id, register_type, register_address),
-            fetchone=True,
         )
 
     def list_critical_registers(self):

@@ -182,6 +182,48 @@ def index():
 def live_dashboard():
     return jsonify(get_dashboard_data())
 
+@app.get("/api/critical-registers")
+@login_required
+def critical_registers():
+    try:
+        response = requests.get(
+            f"{API_BASE_URL}/api/critical-registers",
+            headers=backend_headers(),
+            timeout=5,
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 502
+
+
+@app.post("/api/critical-registers")
+@login_required
+def save_critical_register():
+    try:
+        response = requests.post(
+            f"{API_BASE_URL}/api/critical-registers",
+            headers=backend_headers(),
+            json=request.get_json(silent=True) or {},
+            timeout=5,
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 502
+
+
+@app.delete("/api/critical-registers/<int:register_id>")
+@login_required
+def delete_critical_register(register_id):
+    try:
+        response = requests.delete(
+            f"{API_BASE_URL}/api/critical-registers/{register_id}",
+            headers=backend_headers(),
+            timeout=5,
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 502
+
 
 @app.post("/api/devices/<int:device_id>/approve")
 @login_required

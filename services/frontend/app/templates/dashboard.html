@@ -23,7 +23,11 @@
                 <a class="nav-item" href="#">Connections</a>
                 <a class="nav-item" href="#">Latency</a>
                 <a class="nav-item" href="#">Ports</a>
+                <button class="nav-item nav-button" id="critical-registers-open" type="button">
+                    Critical registers
+                </button>
             </nav>
+            
 
             <div class="sidebar-card">
                 <h3>Sensor</h3>
@@ -174,6 +178,7 @@
     </div>
 
 <div id="approval-modal-root"></div>
+<div id="critical-register-modal-root"></div>
 
 <script>
     window.__DASHBOARD_INITIAL_DATA__ = {{ data | tojson }};
