@@ -18,7 +18,7 @@ services:
     networks:
       - modbus_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d modbus_fw"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
