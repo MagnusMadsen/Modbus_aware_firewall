@@ -20,7 +20,6 @@ import { renderApprovalLog } from "./approvalLog.js";
 
 import {
     openCriticalRegistersModal,
-    renderCriticalRegistersModal,
 } from "./criticalRegisters.js";
 
 
@@ -80,7 +79,6 @@ function renderAll() {
 
     renderApprovalModal(dashboardData, refreshDashboardData);
     renderApprovalLog(elements.approvalLogList);
-    renderCriticalRegistersModal();
 }
 
 async function refreshDashboardData() {
