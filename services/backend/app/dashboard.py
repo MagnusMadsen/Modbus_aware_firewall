@@ -189,11 +189,12 @@ def get_arp_monitor(cur):
         """
         SELECT
             TO_CHAR(ts, 'YYYY-MM-DD HH24:MI:SS') AS time,
+            event_type,
             source_ip::text AS source_ip,
             old_value,
             new_value
         FROM events
-        WHERE event_type = 'arp_mac_changed'
+        WHERE event_type IN ('arp_mac_changed', 'identity_mac_changed')
         ORDER BY ts DESC
         LIMIT 10
         """
@@ -202,9 +203,11 @@ def get_arp_monitor(cur):
 
     events = []
     for row in rows:
+        event_label = "Identity MAC change" if row.get("event_type") == "identity_mac_changed" else "ARP MAC change"
+
         events.append(
             {
-                "type": "ARP MAC change",
+                "type": event_label,
                 "severity": "high",
                 "details": f"{row['source_ip']} changed MAC from {row['old_value']} to {row['new_value']}",
                 "time": row["time"],
