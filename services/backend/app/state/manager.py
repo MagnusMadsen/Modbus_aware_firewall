@@ -12,8 +12,11 @@ from storage import get_writer
 
 LEARNING_WINDOW_SECONDS = int(os.getenv("LEARNING_WINDOW_SECONDS", "300"))
 FLUSH_INTERVAL_SECONDS = int(os.getenv("FLUSH_INTERVAL_SECONDS", "5"))
-REQUEST_TIMEOUT_SECONDS = float(os.getenv("REQUEST_TIMEOUT_SECONDS", "2.0"))
-LATENCY_SPIKE_MS = float(os.getenv("LATENCY_SPIKE_MS", "500.0"))
+
+REQUEST_TIMEOUT_SECONDS = float(os.getenv("REQUEST_TIMEOUT_SECONDS", "10.0"))
+LATENCY_SPIKE_MS = float(os.getenv("LATENCY_SPIKE_MS", "1000.0"))
+TIMEOUT_EVENT_THROTTLE_SECONDS = float(os.getenv("TIMEOUT_EVENT_THROTTLE_SECONDS", "60.0"))
+
 DEVICE_SQL_TOUCH_SECONDS = int(os.getenv("DEVICE_SQL_TOUCH_SECONDS", "30"))
 CONNECTION_SQL_TOUCH_SECONDS = int(os.getenv("CONNECTION_SQL_TOUCH_SECONDS", "30"))
 
@@ -51,6 +54,7 @@ class ModbusStateManager:
             learning_mode=self.in_learning_mode,
             request_timeout_seconds=REQUEST_TIMEOUT_SECONDS,
             latency_spike_ms=LATENCY_SPIKE_MS,
+            timeout_event_throttle_seconds=TIMEOUT_EVENT_THROTTLE_SECONDS,
         )
 
     def in_learning_mode(self):
@@ -127,3 +131,5 @@ class ModbusStateManager:
             function_code=function_code,
             details={"message": "New function code observed on this slave"},
         )
+
+
