@@ -196,7 +196,7 @@ def get_arp_monitor(cur):
         FROM events
         WHERE event_type IN ('arp_mac_changed', 'identity_mac_changed')
         ORDER BY ts DESC
-        LIMIT 10
+        LIMIT 4
         """
     )
     rows = cur.fetchall()
