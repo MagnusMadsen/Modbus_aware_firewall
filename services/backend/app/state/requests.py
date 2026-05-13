@@ -1,5 +1,18 @@
 from state.time_utils import now
 
+from datetime import datetime
+
+
+def _packet_time(data):
+    ts = data.get("ts")
+    if not ts:
+        return now()
+
+    try:
+        return datetime.fromisoformat(ts)
+    except ValueError:
+        return now()
+
 
 class RequestTracker:
     def __init__(
@@ -32,7 +45,7 @@ class RequestTracker:
         key = (master_ip, slave_ip, transaction_id, unit_id)
 
         self.pending_requests[key] = {
-            "ts": now(),
+            "ts": _packet_time(data),
             "function_code": data.get("function_code"),
             "register_type": data.get("register_type"),
             "register_address": data.get("register_address"),
@@ -56,7 +69,7 @@ class RequestTracker:
         if pending is None:
             return
 
-        latency_ms = round((now() - pending["ts"]).total_seconds() * 1000.0, 2)
+        latency_ms = round((_packet_time(data) - pending["ts"]).total_seconds() * 1000.0, 2)
         self.metrics.add_latency(latency_ms)
 
         if latency_ms >= self.latency_spike_ms and not self.learning_mode():
