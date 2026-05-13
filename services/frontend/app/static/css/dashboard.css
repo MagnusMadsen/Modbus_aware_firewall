@@ -740,6 +740,32 @@ th {
     font-size: 13px;
 }
 
+.arp-event-list {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(145,165,190,0.35) rgba(255,255,255,0.03);
+}
+
+.arp-event-list::-webkit-scrollbar {
+    width: 10px;
+}
+
+.arp-event-list::-webkit-scrollbar-track {
+    background: var(--surface-soft);
+    border-radius: 999px;
+}
+
+.arp-event-list::-webkit-scrollbar-thumb {
+    background: rgba(145,165,190,0.35);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+.arp-event-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(145,165,190,0.55);
+    background-clip: padding-box;
+}
+
 @media (max-width: 1100px) {
     .arp-summary,
     .arp-grid {
