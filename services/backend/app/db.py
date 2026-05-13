@@ -1,10 +1,23 @@
+# formål: 
+#   1. Oprette PostgreSQL-forbindelser
+#   2. Kontrollere at database-schemaet er klar ved backend startup
+#   3. Den opretter ikke tabeller den kontrollerer kun, at de nødvendige tabeller findes.
 
 import os
 
-from config import read_secret_env
-
 import psycopg2
 
+from config import read_secret_env
+
+
+REQUIRED_TABLES = {
+    "devices",
+    "observed_connections",
+    "modbus_register_state",
+    "events",
+    "metrics_bucket",
+    "critical_registers",
+}
 
 
 def get_connection():
@@ -16,16 +29,8 @@ def get_connection():
         password=read_secret_env("DB_PASSWORD"),
     )
 
-def init_db():
-    required_tables = {
-        "devices",
-        "observed_connections",
-        "modbus_register_state",
-        "events",
-        "metrics_bucket",
-        "critical_registers",
-    }
 
+def verify_schema():
     conn = get_connection()
     cur = None
 
@@ -38,11 +43,11 @@ def init_db():
             WHERE table_schema = 'public'
               AND table_name = ANY(%s)
             """,
-            (list(required_tables),),
+            (list(REQUIRED_TABLES),),
         )
 
         existing_tables = {row[0] for row in cur.fetchall()}
-        missing_tables = sorted(required_tables - existing_tables)
+        missing_tables = sorted(REQUIRED_TABLES - existing_tables)
 
         if missing_tables:
             raise RuntimeError(
@@ -54,5 +59,3 @@ def init_db():
         if cur is not None:
             cur.close()
         conn.close()
-
-        
