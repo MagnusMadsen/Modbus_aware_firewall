@@ -31,6 +31,25 @@ def build_combined_series(rows):
     return series
 
 
+def build_chart_events(rows):
+    events = []
+
+    for row in rows:
+        label = row["event_type"]
+        if row["register_address"] is not None:
+            label = f"{row['event_type']} reg {row['register_address']}"
+
+        events.append(
+            {
+                "time": row["time"],
+                "label": label,
+                "severity": row["severity"],
+            }
+        )
+
+    return list(reversed(events))
+
+
 def build_recent_events(rows):
     events = []
 
@@ -86,8 +105,6 @@ def build_arp_monitor(rows):
         events.append(
             {
                 "type": event_label,
-                "severity": "high",
-                "details": f"{row['source_ip']} changed MAC from {row['old_value']} to { event_label,
                 "severity": "high",
                 "details": f"{row['source_ip']} changed MAC from {row['old_value']} to {row['new_value']}",
                 "time": row["time"],

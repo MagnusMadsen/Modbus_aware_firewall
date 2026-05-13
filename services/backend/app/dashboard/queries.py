@@ -95,3 +95,38 @@ def get_devices():
         ORDER BY last_seen DESC
         """
     )
+
+def get_chart_event_rows():
+    return query_all(
+        """
+        SELECT
+            TO_CHAR(ts, 'HH24:MI:SS') AS time,
+            event_type,
+            severity,
+            source_ip::text AS source_ip,
+            target_ip::text AS target_ip,
+            register_address,
+            old_value,
+            new_value
+        FROM events
+        WHERE ts >= NOW() - INTERVAL '30 minutes'
+        ORDER BY ts DESC
+        LIMIT 50
+        """
+    )
+
+
+def get_connection_rows():
+    return query_all(
+        """
+        SELECT
+            master_ip::text AS master_ip,
+            slave_ip::text AS slave_ip,
+            COALESCE(unit_id, 0) AS unit_id,
+            request_count,
+            TO_CHAR(last_seen, 'YYYY-MM-DD HH24:MI:SS') AS last_seen
+        FROM observed_connections
+        ORDER BY master_ip, slave_ip, unit_id
+        """
+    )
+
