@@ -196,7 +196,7 @@ def _infer_direction(src_port, dst_port, function_code, pdu):
 
 def parse_packet(pkt):
     data = {
-        "ts": datetime.utcnow().isoformat(),
+        "ts": datetime.fromtimestamp(float(pkt.time)).isoformat(),
         "src_mac": None,
         "dst_mac": None,
         "src_ip": None,

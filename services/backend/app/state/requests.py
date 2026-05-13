@@ -70,6 +70,13 @@ class RequestTracker:
             return
 
         latency_ms = round((_packet_time(data) - pending["ts"]).total_seconds() * 1000.0, 2)
+
+        if latency_ms < 0:
+            return
+
+        if latency_ms > 10000:
+            return
+
         self.metrics.add_latency(latency_ms)
 
         if latency_ms >= self.latency_spike_ms and not self.learning_mode():
