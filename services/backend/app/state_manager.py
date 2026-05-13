@@ -1,5 +1,5 @@
-import os
 import threading
+<<<<<<< HEAD
 import time
 from datetime import datetime
 
@@ -524,7 +524,10 @@ class ModbusStateManager:
                     "pin_reason": "Request timeout",
                 },
             )
+=======
+>>>>>>> origin/refactor/split-state-manager
 
+from state.manager import ModbusStateManager
 
 _manager = None
 _manager_lock = threading.Lock()
