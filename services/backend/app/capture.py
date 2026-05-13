@@ -16,7 +16,7 @@ from scapy.all import sniff
 from scapy.error import Scapy_Exception
 
 from packet_parser import parse_packet
-from state_manager import process_observation
+from state import process_observation
 
 CAPTURE_INTERFACE = os.getenv("CAPTURE_INTERFACE", "eth0")
 CAPTURE_FILTER = os.getenv("CAPTURE_FILTER", "arp or tcp port 502")
