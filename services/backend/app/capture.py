@@ -6,7 +6,7 @@ import threading
 from scapy.all import sniff
 from scapy.error import Scapy_Exception
 
-from parser import parse_packet
+from packet_parser import parse_packet
 from state_manager import process_observation
 
 CAPTURE_INTERFACE = os.getenv("CAPTURE_INTERFACE", "eth0")
