@@ -23,8 +23,16 @@ def get_env(name: str, default: str) -> str:
 
 
 def get_int_env(name: str, default: int) -> int:
-    return int(os.getenv(name, str(default)))
+    value = os.getenv(name, str(default))
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise RuntimeError(f"{name} must be an integer, got: {value}") from exc
 
 
 def get_float_env(name: str, default: float) -> float:
-    return float(os.getenv(name, str(default)))
+    value = os.getenv(name, str(default))
+    try:
+        return float(value)
+    except ValueError as exc:
+        raise RuntimeError(f"{name} must be a float, got: {value}") from exc
