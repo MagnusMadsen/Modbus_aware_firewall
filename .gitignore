@@ -4,3 +4,7 @@ secrets/
 services/backend/app/__pycache__/
 data/postgres/
 .env
+
+# Python cache
+__pycache__/
+*.py[cod]
