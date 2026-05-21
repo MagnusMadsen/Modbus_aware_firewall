@@ -161,25 +161,25 @@ def login():
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
 
-    try:
-        response = backend_login(username, password)
+        try:
+            response = backend_login(username, password)
 
-        if response.status_code == 200:
-            result = response.json()
-            user = result.get("user", {})
+            if response.status_code == 200:
+                result = response.json()
+                user = result.get("user", {})
 
-            session.clear()
-            session["authenticated"] = True
-            session["username"] = user.get("username", username)
-            session["role"] = user.get("role", "operator")
-            session.permanent = True
+                session.clear()
+                session["authenticated"] = True
+                session["username"] = user.get("username", username)
+                session["role"] = user.get("role", "operator")
+                session.permanent = True
 
-            return redirect(url_for("index"))
+                return redirect(url_for("index"))
 
-    except Exception:
-        pass
+        except Exception:
+            pass
 
-    flash("Invalid username or password", "error")
+        flash("Invalid username or password", "error")
 
     return render_template("login.html")
 
