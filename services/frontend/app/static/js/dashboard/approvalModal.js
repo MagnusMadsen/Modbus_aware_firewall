@@ -1,4 +1,5 @@
 import { fetchPendingAlerts, handleBackendAlert } from "./api.js";
+import { invalidateApprovalLogCache } from "./approvalLog.js";
 import { escapeHtml } from "./utils/html.js";
 
 let activeAlertId = null;
@@ -99,6 +100,7 @@ export async function renderApprovalModal(_dashboardData, onHandled) {
 async function handleAlert(alertId, action) {
     await handleBackendAlert(alertId, action);
     invalidatePendingAlertsCache();
+    invalidateApprovalLogCache();
 }
 
 function normalizeDetails(details) {
