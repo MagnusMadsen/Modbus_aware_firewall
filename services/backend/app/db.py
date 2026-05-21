@@ -17,6 +17,7 @@ REQUIRED_TABLES = {
     "events",
     "metrics_bucket",
     "critical_registers",
+    "alert_approvals",
 }
 
 

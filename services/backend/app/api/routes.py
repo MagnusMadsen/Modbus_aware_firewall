@@ -9,6 +9,7 @@ from storage import (
     save_critical_register,
 )
 from storage.devices import update_device_status
+from storage.approvals import list_alert_approvals, save_alert_approval
 
 api_bp = Blueprint("api", __name__)
 
@@ -76,3 +77,28 @@ def api_update_device_status(device_id, action):
         return jsonify({"error": "device not found"}), 404
 
     return jsonify({"status": "ok"})
+
+@api_bp.get("/api/alert-approvals")
+@require_api_token
+def api_alert_approvals():
+    return jsonify(list_alert_approvals())
+
+
+@api_bp.post("/api/alert-approvals")
+@require_api_token
+def api_save_alert_approval():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "Invalid JSON payload"}), 400
+
+    required_fields = ["alert_key", "alert_type", "title", "action"]
+    missing = [field for field in required_fields if not payload.get(field)]
+    if missing:
+        return jsonify({"error": "Missing fields: " + ", ".join(missing)}), 400
+
+    if payload["action"] not in {"approve", "block", "ignore"}:
+        return jsonify({"error": "invalid action"}), 400
+
+    save_alert_approval(payload)
+    return jsonify({"status": "ok"})
+

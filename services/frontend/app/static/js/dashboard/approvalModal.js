@@ -2,6 +2,8 @@ import { approveDevice, blockDevice, ignoreDevice } from "./api.js";
 import { acknowledgeAlert, saveApprovalLogEntry } from "./alertStore.js";
 import { escapeHtml } from "./utils/html.js";
 import { findNextAlert } from "./alertRules.js";
+import { approveDevice, blockDevice, ignoreDevice, saveAlertApproval } from "./api.js";
+
 
 let activeAlertKey = null;
 
@@ -68,6 +70,30 @@ export function renderApprovalModal(dashboardData, onHandled) {
         onHandled();
     });
 }
+
+async function handleAlert(alert, action) {
+    saveApprovalLogEntry(alert, action);
+
+    const payload = {
+        alert_key: alert.key,
+        alert_type: alert.type,
+        title: alert.title,
+        message: alert.message,
+        action,
+        details: alert.details || [],
+        device_id: alert.deviceId || null,
+    };
+
+    if (alert.type === "device" && alert.deviceId) {
+        if (action === "approve") await approveDevice(alert.deviceId);
+        if (action === "block") await blockDevice(alert.deviceId);
+        if (action === "ignore") await ignoreDevice(alert.deviceId);
+    }
+
+    await saveAlertApproval(payload);
+    acknowledgeAlert(alert.key);
+}
+
 
 async function handleAlert(alert, action) {
     saveApprovalLogEntry(alert, action);

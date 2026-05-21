@@ -78,3 +78,23 @@ export async function deleteCriticalRegister(registerId) {
 }
 
 
+export async function saveAlertApproval(payload) {
+    const response = await fetch("/api/alert-approvals", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        cache: "no-store",
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Alert approval save failed with status ${response.status}`);
+    }
+
+    return response.json();
+}
+
+
+
+
