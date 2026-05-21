@@ -1,9 +1,12 @@
 # formål: 
 #   1. Oprette PostgreSQL-forbindelser
 #   2. Kontrollere at database-schemaet er klar ved backend startup
-#   3. Den opretter ikke tabeller den kontrollerer kun, at de nødvendige tabeller findes.
+#   3. 
 
+import glob
+import hashlib
 import os
+from pathlib import Path
 
 import psycopg2
 
@@ -20,6 +23,8 @@ REQUIRED_TABLES = {
     "alert_approvals",
 }
 
+MIGRATIONS_DIR = os.getenv("DB_MIGRATIONS_DIR", "/db-migrations")
+
 
 def get_connection():
     return psycopg2.connect(
@@ -31,7 +36,115 @@ def get_connection():
     )
 
 
+def ensure_migration_table(cur):
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            version TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            checksum TEXT NOT NULL,
+            applied_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
+        """
+    )
+
+
+def parse_migration(path: str):
+    filename = Path(path).name
+    stem = Path(path).stem
+
+    if "_" not in stem:
+        raise RuntimeError(f"Invalid migration filename: {filename}")
+
+    version, name = stem.split("_", 1)
+
+    if not version.isdigit():
+        raise RuntimeError(f"Invalid migration version: {filename}")
+
+    with open(path, "r", encoding="utf-8") as file:
+        sql = file.read()
+
+    checksum = hashlib.sha256(sql.encode("utf-8")).hexdigest()
+
+    return {
+        "version": version,
+        "name": name,
+        "filename": filename,
+        "sql": sql,
+        "checksum": checksum,
+    }
+
+
+def get_applied_migrations(cur):
+    cur.execute(
+        """
+        SELECT version, checksum
+        FROM schema_migrations
+        """
+    )
+    return {row[0]: row[1] for row in cur.fetchall()}
+
+
+def run_migrations():
+    migration_paths = sorted(glob.glob(os.path.join(MIGRATIONS_DIR, "*.sql")))
+
+    if not migration_paths:
+        raise RuntimeError(f"No database migrations found in {MIGRATIONS_DIR}")
+
+    conn = get_connection()
+    cur = None
+
+    try:
+        cur = conn.cursor()
+
+        cur.execute("SELECT pg_advisory_lock(502502);")
+
+        ensure_migration_table(cur)
+        applied = get_applied_migrations(cur)
+
+        for path in migration_paths:
+            migration = parse_migration(path)
+            applied_checksum = applied.get(migration["version"])
+
+            if applied_checksum:
+                if applied_checksum != migration["checksum"]:
+                    raise RuntimeError(
+                        "Migration checksum mismatch for "
+                        + migration["filename"]
+                        + ". Do not edit migrations after they have been applied."
+                    )
+                continue
+
+            cur.execute(migration["sql"])
+
+            cur.execute(
+                """
+                INSERT INTO schema_migrations (version, name, checksum)
+                VALUES (%s, %s, %s)
+                """,
+                (
+                    migration["version"],
+                    migration["name"],
+                    migration["checksum"],
+                ),
+            )
+
+        cur.execute("SELECT pg_advisory_unlock(502502);")
+        conn.commit()
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        if cur is not None:
+            cur.close()
+        conn.close()
+
+
 def verify_schema():
+    run_migrations()
+
     conn = get_connection()
     cur = None
 
@@ -60,3 +173,4 @@ def verify_schema():
         if cur is not None:
             cur.close()
         conn.close()
+
