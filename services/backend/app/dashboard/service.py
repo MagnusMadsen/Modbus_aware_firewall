@@ -17,10 +17,13 @@ from dashboard.queries import (
     get_metric_rows,
     get_recent_event_rows,
     get_recent_metrics,
+    get_stale_connection_rows,
+    get_stale_slave_rows,
 )
 from storage.alerts import create_or_touch_alert
 
 CAPTURE_INTERFACE = os.getenv("CAPTURE_INTERFACE", "eth0")
+SLAVE_STALE_SECONDS = int(os.getenv("SLAVE_STALE_SECONDS", "20"))
 
 
 def fetch_devices():
@@ -30,7 +33,8 @@ def fetch_devices():
 def fetch_summary():
     devices = fetch_devices()
     recent_metrics = get_recent_metrics()
-    connections = build_connection_groups(get_connection_rows())
+    connection_rows = get_connection_rows()
+    connections = build_connection_groups(connection_rows)
 
     combined_series = build_combined_series(get_metric_rows())
     chart_events = build_chart_events(get_chart_event_rows())
@@ -43,6 +47,8 @@ def fetch_summary():
         combined_series=combined_series,
         arp_monitor=arp_monitor,
         ports=ports,
+        stale_slaves=get_stale_slave_rows(SLAVE_STALE_SECONDS),
+        stale_connections=get_stale_connection_rows(SLAVE_STALE_SECONDS),
     )
 
     avg_latency = recent_metrics["avg_latency_ms"] or 0
@@ -70,13 +76,15 @@ def fetch_summary():
     }
 
 
-def sync_dashboard_alerts(devices, combined_series, arp_monitor, ports):
+def sync_dashboard_alerts(devices, combined_series, arp_monitor, ports, stale_slaves, stale_connections):
     create_pending_device_alert(devices)
     create_arp_alert(arp_monitor)
     create_downtime_alert(combined_series)
     create_failed_request_alert(combined_series)
     create_latency_alert(combined_series)
     create_active_port_alerts(ports)
+    create_stale_slave_alerts(stale_slaves)
+    create_stale_connection_alerts(stale_connections)
 
 
 def create_pending_device_alert(devices):
@@ -211,6 +219,60 @@ def create_active_port_alerts(ports):
                 "interface": port.get("name") or "-",
                 "state": port.get("state") or "-",
                 "activity": port.get("activity") or "-",
+            },
+        )
+
+
+def create_stale_slave_alerts(stale_slaves):
+    for slave in stale_slaves or []:
+        ip = slave.get("ip")
+        if not ip:
+            continue
+
+        create_or_touch_alert(
+            alert_key=f"slave-stale:{ip}",
+            alert_type="slave_stale",
+            title="SLAVE KOMMUNIKATION MISTET",
+            message="En tidligere observeret Modbus-slave er ikke set inden for forventet tidsvindue.",
+            severity="high",
+            source_ip=ip,
+            device_id=slave.get("id"),
+            details={
+                "ip": ip,
+                "mac": slave.get("mac") or "-",
+                "role": slave.get("role") or "slave",
+                "last_seen": slave.get("last_seen") or "-",
+                "seconds_since_seen": slave.get("seconds_since_seen"),
+                "threshold_seconds": SLAVE_STALE_SECONDS,
+            },
+        )
+
+
+def create_stale_connection_alerts(stale_connections):
+    for connection in stale_connections or []:
+        master_ip = connection.get("master_ip")
+        slave_ip = connection.get("slave_ip")
+        unit_id = connection.get("unit_id")
+
+        if not master_ip or not slave_ip:
+            continue
+
+        create_or_touch_alert(
+            alert_key=f"connection-stale:{master_ip}:{slave_ip}:{unit_id}",
+            alert_type="connection_stale",
+            title="MASTER-SLAVE FORBINDELSE MISTET",
+            message="En tidligere observeret Modbus master/slave-forbindelse er ikke set inden for forventet tidsvindue.",
+            severity="high",
+            source_ip=master_ip,
+            target_ip=slave_ip,
+            details={
+                "master_ip": master_ip,
+                "slave_ip": slave_ip,
+                "unit_id": unit_id,
+                "last_seen": connection.get("last_seen") or "-",
+                "seconds_since_seen": connection.get("seconds_since_seen"),
+                "request_count": connection.get("request_count"),
+                "threshold_seconds": SLAVE_STALE_SECONDS,
             },
         )
 
