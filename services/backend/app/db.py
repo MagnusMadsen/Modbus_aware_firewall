@@ -26,6 +26,46 @@ REQUIRED_TABLES = {
 
 MIGRATIONS_DIR = os.getenv("DB_MIGRATIONS_DIR", "/db-migrations")
 
+BUILTIN_MIGRATIONS = [
+    {
+        "version": "003",
+        "name": "create_alerts",
+        "filename": "003_create_alerts.sql",
+        "sql": """
+        CREATE TABLE IF NOT EXISTS alerts (
+            id BIGSERIAL PRIMARY KEY,
+            alert_key TEXT NOT NULL UNIQUE,
+            alert_type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            message TEXT,
+            severity TEXT NOT NULL DEFAULT 'medium',
+            source_ip INET,
+            target_ip INET,
+            device_id INTEGER REFERENCES devices(id) ON DELETE SET NULL,
+            details JSONB NOT NULL DEFAULT '{}'::jsonb,
+            status TEXT NOT NULL DEFAULT 'pending',
+            action TEXT,
+            handled_by TEXT,
+            handled_at TIMESTAMP,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            CONSTRAINT chk_alerts_status
+                CHECK (status IN ('pending', 'approved', 'blocked', 'ignored')),
+            CONSTRAINT chk_alerts_action
+                CHECK (action IS NULL OR action IN ('approve', 'block', 'ignore')),
+            CONSTRAINT chk_alerts_severity
+                CHECK (severity IN ('info', 'low', 'medium', 'high', 'critical'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_alerts_status_created
+            ON alerts (status, created_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_alerts_updated_at
+            ON alerts (updated_at DESC);
+        """,
+    }
+]
+
 
 def get_connection():
     return psycopg2.connect(
@@ -65,6 +105,10 @@ def parse_migration(path: str):
     with open(path, "r", encoding="utf-8") as file:
         sql = file.read()
 
+    return build_migration(version, name, filename, sql)
+
+
+def build_migration(version: str, name: str, filename: str, sql: str):
     checksum = hashlib.sha256(sql.encode("utf-8")).hexdigest()
 
     return {
@@ -76,6 +120,18 @@ def parse_migration(path: str):
     }
 
 
+def get_builtin_migrations():
+    return [
+        build_migration(
+            item["version"],
+            item["name"],
+            item["filename"],
+            item["sql"],
+        )
+        for item in BUILTIN_MIGRATIONS
+    ]
+
+
 def get_applied_migrations(cur):
     cur.execute(
         """
@@ -84,6 +140,22 @@ def get_applied_migrations(cur):
         """
     )
     return {row[0]: row[1] for row in cur.fetchall()}
+
+
+def apply_migration(cur, migration):
+    cur.execute(migration["sql"])
+
+    cur.execute(
+        """
+        INSERT INTO schema_migrations (version, name, checksum)
+        VALUES (%s, %s, %s)
+        """,
+        (
+            migration["version"],
+            migration["name"],
+            migration["checksum"],
+        ),
+    )
 
 
 def run_migrations():
@@ -102,8 +174,11 @@ def run_migrations():
         ensure_migration_table(cur)
         applied = get_applied_migrations(cur)
 
-        for path in migration_paths:
-            migration = parse_migration(path)
+        migrations = [parse_migration(path) for path in migration_paths]
+        migrations.extend(get_builtin_migrations())
+        migrations.sort(key=lambda item: item["version"])
+
+        for migration in migrations:
             applied_checksum = applied.get(migration["version"])
 
             if applied_checksum:
@@ -115,19 +190,7 @@ def run_migrations():
                     )
                 continue
 
-            cur.execute(migration["sql"])
-
-            cur.execute(
-                """
-                INSERT INTO schema_migrations (version, name, checksum)
-                VALUES (%s, %s, %s)
-                """,
-                (
-                    migration["version"],
-                    migration["name"],
-                    migration["checksum"],
-                ),
-            )
+            apply_migration(cur, migration)
 
         conn.commit()
 
