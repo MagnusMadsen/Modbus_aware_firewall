@@ -1,16 +1,36 @@
-import { fetchAlertApprovals } from "./api.js";
-import { getApprovalLogEntries } from "./alertStore.js";
+import { fetchAlertHistory } from "./api.js";
 import { escapeHtml } from "./utils/html.js";
+
+let cachedEntries = [];
+let lastFetchAt = 0;
+const CACHE_MS = 10000;
+
+export function invalidateApprovalLogCache() {
+    cachedEntries = [];
+    lastFetchAt = 0;
+}
+
+async function loadAlertHistory() {
+    const now = Date.now();
+
+    if (cachedEntries.length && now - lastFetchAt < CACHE_MS) {
+        return cachedEntries;
+    }
+
+    cachedEntries = await fetchAlertHistory();
+    lastFetchAt = now;
+    return cachedEntries;
+}
 
 function normalizeEntry(entry) {
     return {
         title: entry.title || "-",
-        handledAt: entry.handled_at || entry.handledAt || "-",
-        type: entry.alert_type || entry.type || "-",
+        handledAt: entry.handled_at || entry.updated_at || entry.created_at || "-",
+        type: entry.alert_type || "-",
         status: entry.status || "-",
         action: entry.action || "-",
         message: entry.message || "-",
-        details: Array.isArray(entry.details) ? entry.details : [],
+        details: entry.details && typeof entry.details === "object" ? entry.details : {},
     };
 }
 
@@ -20,10 +40,10 @@ export async function renderApprovalLog(container) {
     let entries = [];
 
     try {
-        entries = await fetchAlertApprovals();
+        entries = await loadAlertHistory();
     } catch (error) {
-        console.error("Approval log fetch failed, using local fallback", error);
-        entries = getApprovalLogEntries();
+        console.error("Alert history fetch failed", error);
+        entries = [];
     }
 
     if (!Array.isArray(entries) || !entries.length) {
@@ -37,11 +57,7 @@ export async function renderApprovalLog(container) {
 
     container.innerHTML = entries.map((rawEntry) => {
         const entry = normalizeEntry(rawEntry);
-
-        const detailText = entry.details
-            .slice(0, 2)
-            .map((item) => `${item.label}: ${item.value}`)
-            .join(" | ");
+        const detailText = formatDetails(entry.details);
 
         return `
             <div class="approval-log-item">
@@ -68,4 +84,16 @@ export async function renderApprovalLog(container) {
             </div>
         `;
     }).join("");
+}
+
+function formatDetails(details) {
+    if (!details || typeof details !== "object" || Array.isArray(details)) {
+        return "";
+    }
+
+    return Object.entries(details)
+        .filter(([, value]) => value !== null && value !== undefined && value !== "")
+        .slice(0, 2)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join(" | ");
 }
