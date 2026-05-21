@@ -1,4 +1,4 @@
-
+# formål
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 
@@ -7,7 +7,7 @@ from flask_limiter.util import get_remote_address
 
 from datetime import datetime, timedelta
 from functools import wraps
-from werkzeug.security import check_password_hash
+
 import os
 import requests
 
@@ -46,11 +46,6 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(hours=1),
 )
 
-USERNAME = os.getenv("APP_USERNAME")
-if not USERNAME:
-    raise RuntimeError("APP_USERNAME is not set")
-
-PASSWORD_HASH = read_secret("frontend_password_hash")
 BACKEND_API_TOKEN = read_secret("backend_api_token")
 API_BASE_URL = os.getenv("API_BASE_URL", "http://host.docker.internal:8000")
 
@@ -58,6 +53,19 @@ def backend_headers() -> dict:
     return {
         "X-API-Token": BACKEND_API_TOKEN
     }
+
+def backend_login(username: str, password: str):
+    response = requests.post(
+        f"{API_BASE_URL}/api/auth/login",
+        headers=backend_headers(),
+        json={
+            "username": username,
+            "password": password,
+        },
+        timeout=5,
+    )
+
+    return response
 
 
 def login_required(view_func):
@@ -98,6 +106,8 @@ def get_dashboard_data():
         "ports": [],
         "events": [],
         "devices": [],
+        "approved_alarm_keys": [],
+        "alarm_approvals": [],
     }
 
     try:
@@ -127,6 +137,8 @@ def get_dashboard_data():
         data["connections"] = dashboard_json.get("connections", data["connections"])
         data["ports"] = dashboard_json.get("ports", data["ports"])
         data["events"] = dashboard_json.get("events", data["events"])
+        data["approved_alarm_keys"] = dashboard_json.get("approved_alarm_keys", data["approved_alarm_keys"])
+        data["alarm_approvals"] = dashboard_json.get("alarm_approvals", data["alarm_approvals"])
         data["devices"] = devices_json
 
     except Exception as exc:
@@ -149,14 +161,25 @@ def login():
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
 
-        if username == USERNAME and check_password_hash(PASSWORD_HASH, password):
+    try:
+        response = backend_login(username, password)
+
+        if response.status_code == 200:
+            result = response.json()
+            user = result.get("user", {})
+
             session.clear()
             session["authenticated"] = True
-            session["username"] = username
+            session["username"] = user.get("username", username)
+            session["role"] = user.get("role", "operator")
             session.permanent = True
+
             return redirect(url_for("index"))
 
-        flash("Invalid username or password", "error")
+    except Exception:
+        pass
+
+    flash("Invalid username or password", "error")
 
     return render_template("login.html")
 
@@ -181,6 +204,39 @@ def index():
 @login_required
 def live_dashboard():
     return jsonify(get_dashboard_data())
+
+
+@app.get("/api/alarm-approvals")
+@login_required
+def alarm_approvals():
+    try:
+        response = requests.get(
+            f"{API_BASE_URL}/api/alarm-approvals",
+            headers=backend_headers(),
+            timeout=5,
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 502
+
+
+@app.post("/api/alarm-approvals")
+@login_required
+def save_alarm_approval():
+    payload = request.get_json(silent=True) or {}
+    payload["handled_by"] = session.get("username", "unknown")
+
+    try:
+        response = requests.post(
+            f"{API_BASE_URL}/api/alarm-approvals",
+            headers=backend_headers(),
+            json=payload,
+            timeout=5,
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 502
+
 
 @app.get("/api/critical-registers")
 @login_required
@@ -244,10 +300,14 @@ def ignore_device(device_id):
 
 
 def proxy_device_action(device_id: int, action: str):
+    payload = request.get_json(silent=True) or {}
+    payload["handled_by"] = session.get("username", "unknown")
+
     try:
         response = requests.post(
             f"{API_BASE_URL}/api/devices/{device_id}/{action}",
             headers=backend_headers(),
+            json=payload,
             timeout=5,
         )
         return jsonify(response.json()), response.status_code

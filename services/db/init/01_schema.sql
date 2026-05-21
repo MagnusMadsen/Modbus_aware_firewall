@@ -82,6 +82,41 @@ CREATE TABLE IF NOT EXISTS events (
         )
 );
 
+CREATE TABLE IF NOT EXISTS app_users (
+    id SERIAL PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT,
+    role TEXT NOT NULL DEFAULT 'operator',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    last_login TIMESTAMP,
+
+    CONSTRAINT chk_app_users_role
+        CHECK (role IN ('admin', 'operator', 'viewer'))
+);
+
+CREATE TABLE IF NOT EXISTS alarm_approvals (
+    id BIGSERIAL PRIMARY KEY,
+
+    alarm_key TEXT NOT NULL UNIQUE,
+    alarm_type TEXT NOT NULL,
+
+    action TEXT NOT NULL,
+    status TEXT NOT NULL,
+
+    handled_by TEXT NOT NULL,
+    handled_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    event_id BIGINT REFERENCES events(id) ON DELETE SET NULL,
+    details JSONB NOT NULL DEFAULT '{}'::jsonb,
+
+    CONSTRAINT chk_alarm_approvals_action
+        CHECK (action IN ('approve', 'block', 'ignore', 'critical')),
+
+    CONSTRAINT chk_alarm_approvals_status
+        CHECK (status IN ('approved', 'blocked', 'ignored', 'critical'))
+);
+
 CREATE TABLE IF NOT EXISTS metrics_bucket (
     id BIGSERIAL PRIMARY KEY,
     bucket_ts TIMESTAMP NOT NULL UNIQUE,
@@ -149,3 +184,15 @@ CREATE INDEX IF NOT EXISTS idx_metrics_bucket_ts
 
 CREATE INDEX IF NOT EXISTS idx_critical_registers_lookup
     ON critical_registers (slave_ip, unit_id, register_type, register_address);
+
+CREATE INDEX IF NOT EXISTS idx_app_users_username
+    ON app_users (username);
+
+CREATE INDEX IF NOT EXISTS idx_alarm_approvals_alarm_key
+    ON alarm_approvals (alarm_key);
+
+CREATE INDEX IF NOT EXISTS idx_alarm_approvals_handled_at
+    ON alarm_approvals (handled_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_alarm_approvals_type
+    ON alarm_approvals (alarm_type);

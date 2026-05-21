@@ -1,16 +1,52 @@
-const APPROVAL_LOG_KEY = "approval-log";
+let approvedAlarmKeys = new Set();
+let approvalLogEntries = [];
+
+
+export function hydrateApprovalStore(dashboardData) {
+    approvedAlarmKeys = new Set(
+        (dashboardData.approved_alarm_keys || []).map((key) => String(key))
+    );
+
+    approvalLogEntries = (dashboardData.alarm_approvals || []).map((entry) => ({
+        id: entry.id,
+        alertKey: entry.alarm_key,
+        type: entry.alarm_type,
+        title: entry.details?.title || entry.alarm_type,
+        message: entry.details?.message || "-",
+        status: entry.status,
+        action: entry.action,
+        details: entry.details?.details || [],
+        handledBy: entry.handled_by,
+        handledAt: entry.handled_at,
+    }));
+}
+
 
 export function isAlertAcknowledged(alertKey) {
-    return Boolean(localStorage.getItem(getAckKey(alertKey)));
+    return approvedAlarmKeys.has(String(alertKey));
 }
+
 
 export function acknowledgeAlert(alertKey) {
-    localStorage.setItem(getAckKey(alertKey), new Date().toISOString());
+    approvedAlarmKeys.add(String(alertKey));
 }
 
-export function saveApprovalLogEntry(alert, action) {
-    const entries = getApprovalLogEntries();
 
+export function buildApprovalPayload(alert, action) {
+    return {
+        alarm_key: alert.key,
+        alarm_type: alert.type,
+        action,
+        details: {
+            title: alert.title,
+            message: alert.message,
+            details: alert.details || [],
+        },
+    };
+}
+
+
+export function saveApprovalLogEntry(alert, action) {
     const entry = {
         id: `${alert.key}:${Date.now()}`,
         alertKey: alert.key,
@@ -20,24 +56,18 @@ export function saveApprovalLogEntry(alert, action) {
         status: mapActionToStatus(action),
         action,
         details: alert.details || [],
+        handledBy: "Gemmes i SQL...",
         handledAt: new Date().toLocaleString(),
     };
 
-    const updated = [entry, ...entries].slice(0, 50);
-    localStorage.setItem(APPROVAL_LOG_KEY, JSON.stringify(updated));
+    approvalLogEntries = [entry, ...approvalLogEntries].slice(0, 50);
 }
+
 
 export function getApprovalLogEntries() {
-    try {
-        return JSON.parse(localStorage.getItem(APPROVAL_LOG_KEY) || "[]");
-    } catch {
-        return [];
-    }
+    return approvalLogEntries;
 }
 
-function getAckKey(alertKey) {
-    return `ack:${alertKey}`;
-}
 
 function mapActionToStatus(action) {
     if (action === "approve") return "approved";

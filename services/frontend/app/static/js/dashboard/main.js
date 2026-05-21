@@ -1,3 +1,4 @@
+// formål 
 
 import { fetchDashboardData } from "./api.js";
 
@@ -17,6 +18,7 @@ import { renderPorts } from "./ports.js";
 import { renderChart, findClosestSeriesIndexByTime, centerViewOnIndex } from "./chart.js";
 import { renderApprovalModal } from "./approvalModal.js";
 import { renderApprovalLog } from "./approvalLog.js";
+import { hydrateApprovalStore } from "./alertStore.js";
 
 import {
     openCriticalRegistersModal,
@@ -85,6 +87,7 @@ async function refreshDashboardData() {
     try {
         const oldLength = getSeries().length;
         const freshData = await fetchDashboardData();
+        hydrateApprovalStore(freshData);
         setDashboardData(freshData);
         syncWindowAfterRefresh(oldLength);
         renderAll();
@@ -95,7 +98,7 @@ async function refreshDashboardData() {
 
 elements.criticalRegistersOpen?.addEventListener("click", openCriticalRegistersModal);
 resetToLiveWindow();
-renderAll();
+refreshDashboardData();
 setInterval(refreshDashboardData, POLL_INTERVAL_MS);
 
 

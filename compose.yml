@@ -60,6 +60,8 @@ services:
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD_FILE: /run/secrets/postgres_password
       BACKEND_API_TOKEN_FILE: /run/secrets/backend_api_token
+      APP_USERNAME: ${APP_USERNAME}
+      FRONTEND_PASSWORD_HASH_FILE: /run/secrets/frontend_password_hash
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
       CAPTURE_INTERFACE: ${CAPTURE_INTERFACE}
@@ -71,6 +73,7 @@ services:
       SNMP_VERSION: ${SNMP_VERSION}
     volumes:
       - ./services/backend:/app
+      - ./services/db/init:/db/init:ro
       - ./data/logs/backend:/app/logs
       - ./data/pcap:/app/pcap
     working_dir: /app
@@ -84,6 +87,7 @@ services:
     secrets:
       - postgres_password
       - backend_api_token
+      - frontend_password_hash
       - snmp_community
 
   frontend:
@@ -98,7 +102,6 @@ services:
       API_BASE_URL: ${API_BASE_URL}
       APP_ENV: ${APP_ENV}
       TZ: ${TZ}
-      APP_USERNAME: ${APP_USERNAME}
       BACKEND_API_TOKEN_FILE: /run/secrets/backend_api_token
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
@@ -107,11 +110,6 @@ services:
     secrets:
       - source: frontend_secret_key
         target: frontend_secret_key
-        uid: "10001"
-        gid: "10001"
-        mode: 0444
-      - source: frontend_password_hash
-        target: frontend_password_hash
         uid: "10001"
         gid: "10001"
         mode: 0444

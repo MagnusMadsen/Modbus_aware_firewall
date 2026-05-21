@@ -1,8 +1,5 @@
-
 import { getApprovalLogEntries } from "./alertStore.js";
 import { escapeHtml } from "./utils/html.js";
-
-const APPROVAL_LOG_KEY = "approval-log";
 
 
 export function renderApprovalLog(container) {
@@ -38,8 +35,13 @@ export function renderApprovalLog(container) {
                 </div>
 
                 <div>
-                    <span class="approval-log-status ${escapeHtml(entry.status)}">
-                        ${escapeHtml(entry.status)}
+                    <strong>Bruger</strong>
+                    <span>${escapeHtml(entry.handledBy || "-")}</span>
+                </div>
+
+                <div>
+                    <span class="approval-log-status ${escapeHtml(entry.status || "")}">
+                        ${escapeHtml(entry.status || "-")}
                     </span>
                 </div>
 
@@ -51,4 +53,3 @@ export function renderApprovalLog(container) {
         `;
     }).join("");
 }
-

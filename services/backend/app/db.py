@@ -9,6 +9,7 @@ import psycopg2
 
 from config import read_secret_env
 
+SCHEMA_FILE = os.getenv("DB_SCHEMA_FILE", "/db/init/01_schema.sql")
 
 REQUIRED_TABLES = {
     "devices",
@@ -17,6 +18,8 @@ REQUIRED_TABLES = {
     "events",
     "metrics_bucket",
     "critical_registers",
+    "app_users",
+    "alarm_approvals",
 }
 
 
@@ -29,6 +32,30 @@ def get_connection():
         password=read_secret_env("DB_PASSWORD"),
     )
 
+def apply_schema():
+    if not os.path.exists(SCHEMA_FILE):
+        raise RuntimeError(f"Database schema file not found: {SCHEMA_FILE}")
+
+    with open(SCHEMA_FILE, "r", encoding="utf-8") as schema_file:
+        schema_sql = schema_file.read()
+
+    if not schema_sql.strip():
+        raise RuntimeError(f"Database schema file is empty: {SCHEMA_FILE}")
+
+    conn = get_connection()
+    cur = None
+
+    try:
+        cur = conn.cursor()
+        cur.execute(schema_sql)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        if cur is not None:
+            cur.close()
+        conn.close()
 
 def verify_schema():
     conn = get_connection()

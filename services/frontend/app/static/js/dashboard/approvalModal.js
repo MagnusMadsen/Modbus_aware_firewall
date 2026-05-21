@@ -1,9 +1,14 @@
-import { approveDevice, blockDevice, ignoreDevice } from "./api.js";
-import { acknowledgeAlert, saveApprovalLogEntry } from "./alertStore.js";
+import { approveDevice, blockDevice, ignoreDevice, saveAlarmApproval } from "./api.js";
+import {
+    acknowledgeAlert,
+    buildApprovalPayload,
+    saveApprovalLogEntry,
+} from "./alertStore.js";
 import { escapeHtml } from "./utils/html.js";
 import { findNextAlert } from "./alertRules.js";
 
 let activeAlertKey = null;
+
 
 export function renderApprovalModal(dashboardData, onHandled) {
     const root = document.getElementById("approval-modal-root");
@@ -69,17 +74,32 @@ export function renderApprovalModal(dashboardData, onHandled) {
     });
 }
 
+
 async function handleAlert(alert, action) {
-    saveApprovalLogEntry(alert, action);
+    const approvalAction = normalizeApprovalAction(alert, action);
+    const approvalPayload = buildApprovalPayload(alert, approvalAction);
 
     if (alert.type === "device" && alert.deviceId) {
-        if (action === "approve") await approveDevice(alert.deviceId);
-        if (action === "block") await blockDevice(alert.deviceId);
-        if (action === "ignore") await ignoreDevice(alert.deviceId);
-        return;
+        if (action === "approve") await approveDevice(alert.deviceId, approvalPayload);
+        if (action === "block") await blockDevice(alert.deviceId, approvalPayload);
+        if (action === "ignore") await ignoreDevice(alert.deviceId, approvalPayload);
+    } else {
+        await saveAlarmApproval(approvalPayload);
     }
 
     acknowledgeAlert(alert.key);
+    saveApprovalLogEntry(alert, approvalAction);
 }
 
 
+function normalizeApprovalAction(alert, action) {
+    if (alert.type === "device") {
+        return action;
+    }
+
+    if (action === "block") {
+        return "critical";
+    }
+
+    return action;
+}
