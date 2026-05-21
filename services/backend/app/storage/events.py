@@ -2,6 +2,7 @@ from psycopg2.extras import Json
 
 from storage.base import execute
 from storage.alerts import create_or_touch_alert
+from storage.devices import get_device_by_ip
 
 
 ALERT_EVENT_TYPES = {
@@ -152,8 +153,23 @@ def create_alert_from_event(
         severity=severity,
         source_ip=source_ip,
         target_ip=target_ip,
+        device_id=get_alert_device_id(event_type, source_ip),
         details=alert_details,
     )
+
+
+def get_alert_device_id(event_type, source_ip):
+    if not source_ip:
+        return None
+
+    if event_type not in {"new_device", "identity_mac_changed", "identity_role_changed"}:
+        return None
+
+    device = get_device_by_ip(source_ip)
+    if not device:
+        return None
+
+    return device.get("id")
 
 
 def build_alert_key(
