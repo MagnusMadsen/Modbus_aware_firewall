@@ -1,27 +1,54 @@
-import { approveDevice, blockDevice, ignoreDevice, saveAlertApproval } from "./api.js";
-import { acknowledgeAlert, saveApprovalLogEntry } from "./alertStore.js";
+import { fetchPendingAlerts, handleBackendAlert } from "./api.js";
 import { escapeHtml } from "./utils/html.js";
-import { findNextAlert } from "./alertRules.js";
 
-let activeAlertKey = null;
+let activeAlertId = null;
+let pendingAlertsCache = [];
+let lastFetchAt = 0;
+const CACHE_MS = 5000;
 
-export function renderApprovalModal(dashboardData, onHandled) {
+export function invalidatePendingAlertsCache() {
+    pendingAlertsCache = [];
+    lastFetchAt = 0;
+}
+
+async function loadPendingAlerts() {
+    const now = Date.now();
+
+    if (pendingAlertsCache.length && now - lastFetchAt < CACHE_MS) {
+        return pendingAlertsCache;
+    }
+
+    pendingAlertsCache = await fetchPendingAlerts();
+    lastFetchAt = now;
+    return pendingAlertsCache;
+}
+
+export async function renderApprovalModal(_dashboardData, onHandled) {
     const root = document.getElementById("approval-modal-root");
     if (!root) return;
 
-    const alert = findNextAlert(dashboardData);
+    let alerts = [];
+    try {
+        alerts = await loadPendingAlerts();
+    } catch (error) {
+        console.error("Pending alerts fetch failed", error);
+        return;
+    }
+
+    const alert = Array.isArray(alerts) ? alerts[0] : null;
 
     if (!alert) {
         root.innerHTML = "";
-        activeAlertKey = null;
+        activeAlertId = null;
         return;
     }
 
-    if (activeAlertKey === alert.key) {
+    if (activeAlertId === alert.id) {
         return;
     }
 
-    activeAlertKey = alert.key;
+    activeAlertId = alert.id;
+    const details = normalizeDetails(alert.details);
 
     root.innerHTML = `
         <div class="approval-overlay visible">
@@ -29,11 +56,11 @@ export function renderApprovalModal(dashboardData, onHandled) {
                 <h2>${escapeHtml(alert.title)}</h2>
 
                 <p class="approval-message">
-                    ${escapeHtml(alert.message)}
+                    ${escapeHtml(alert.message || "Alarm requires user review.")}
                 </p>
 
                 <div class="approval-details">
-                    ${(alert.details || []).map((item) => `
+                    ${details.map((item) => `
                         <div class="approval-detail">
                             <span>${escapeHtml(item.label)}</span>
                             <strong>${escapeHtml(item.value)}</strong>
@@ -42,52 +69,54 @@ export function renderApprovalModal(dashboardData, onHandled) {
                 </div>
 
                 <div class="approval-actions">
-                    <button class="approval-approve" data-action="approve">${escapeHtml(alert.approveText)}</button>
-                    <button class="approval-block" data-action="block">${escapeHtml(alert.blockText)}</button>
-                    <button class="approval-ignore" data-action="ignore">${escapeHtml(alert.ignoreText)}</button>
+                    <button class="approval-approve" data-action="approve">GODKEND</button>
+                    <button class="approval-block" data-action="block">BLOKER / KRITISK</button>
+                    <button class="approval-ignore" data-action="ignore">IGNORER</button>
                 </div>
             </div>
         </div>
     `;
 
     root.querySelector("[data-action='approve']").addEventListener("click", async () => {
-        await handleAlert(alert, "approve");
-        activeAlertKey = null;
+        await handleAlert(alert.id, "approve");
+        activeAlertId = null;
         onHandled();
     });
 
     root.querySelector("[data-action='block']").addEventListener("click", async () => {
-        await handleAlert(alert, "block");
-        activeAlertKey = null;
+        await handleAlert(alert.id, "block");
+        activeAlertId = null;
         onHandled();
     });
 
     root.querySelector("[data-action='ignore']").addEventListener("click", async () => {
-        await handleAlert(alert, "ignore");
-        activeAlertKey = null;
+        await handleAlert(alert.id, "ignore");
+        activeAlertId = null;
         onHandled();
     });
 }
 
-async function handleAlert(alert, action) {
-    saveApprovalLogEntry(alert, action);
+async function handleAlert(alertId, action) {
+    await handleBackendAlert(alertId, action);
+    invalidatePendingAlertsCache();
+}
 
-    const payload = {
-        alert_key: alert.key,
-        alert_type: alert.type,
-        title: alert.title,
-        message: alert.message,
-        action,
-        details: alert.details || [],
-        device_id: alert.deviceId || null,
-    };
+function normalizeDetails(details) {
+    const normalized = [];
 
-    if (alert.type === "device" && alert.deviceId) {
-        if (action === "approve") await approveDevice(alert.deviceId);
-        if (action === "block") await blockDevice(alert.deviceId);
-        if (action === "ignore") await ignoreDevice(alert.deviceId);
+    if (!details || typeof details !== "object" || Array.isArray(details)) {
+        return normalized;
     }
 
-    await saveAlertApproval(payload);
-    acknowledgeAlert(alert.key);
+    Object.entries(details)
+        .filter(([, value]) => value !== null && value !== undefined && value !== "")
+        .slice(0, 8)
+        .forEach(([key, value]) => {
+            normalized.push({
+                label: key.replaceAll("_", " "),
+                value: String(value),
+            });
+        });
+
+    return normalized;
 }
