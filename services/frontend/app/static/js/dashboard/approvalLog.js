@@ -1,16 +1,32 @@
-
+import { fetchAlertApprovals } from "./api.js";
 import { getApprovalLogEntries } from "./alertStore.js";
 import { escapeHtml } from "./utils/html.js";
 
-const APPROVAL_LOG_KEY = "approval-log";
+function normalizeEntry(entry) {
+    return {
+        title: entry.title || "-",
+        handledAt: entry.handled_at || entry.handledAt || "-",
+        type: entry.alert_type || entry.type || "-",
+        status: entry.status || "-",
+        action: entry.action || "-",
+        message: entry.message || "-",
+        details: Array.isArray(entry.details) ? entry.details : [],
+    };
+}
 
-
-export function renderApprovalLog(container) {
+export async function renderApprovalLog(container) {
     if (!container) return;
 
-    const entries = getApprovalLogEntries();
+    let entries = [];
 
-    if (!entries.length) {
+    try {
+        entries = await fetchAlertApprovals();
+    } catch (error) {
+        console.error("Approval log fetch failed, using local fallback", error);
+        entries = getApprovalLogEntries();
+    }
+
+    if (!Array.isArray(entries) || !entries.length) {
         container.innerHTML = `
             <div class="approval-log-empty">
                 Ingen alarmgodkendelser endnu.
@@ -19,8 +35,10 @@ export function renderApprovalLog(container) {
         return;
     }
 
-    container.innerHTML = entries.map((entry) => {
-        const detailText = (entry.details || [])
+    container.innerHTML = entries.map((rawEntry) => {
+        const entry = normalizeEntry(rawEntry);
+
+        const detailText = entry.details
             .slice(0, 2)
             .map((item) => `${item.label}: ${item.value}`)
             .join(" | ");
@@ -28,13 +46,13 @@ export function renderApprovalLog(container) {
         return `
             <div class="approval-log-item">
                 <div>
-                    <strong>${escapeHtml(entry.title || "-")}</strong>
-                    <span>${escapeHtml(entry.handledAt || "-")}</span>
+                    <strong>${escapeHtml(entry.title)}</strong>
+                    <span>${escapeHtml(entry.handledAt)}</span>
                 </div>
 
                 <div>
-                    <strong>${escapeHtml(entry.type || "-")}</strong>
-                    <span>${escapeHtml(detailText || entry.message || "-")}</span>
+                    <strong>${escapeHtml(entry.type)}</strong>
+                    <span>${escapeHtml(detailText || entry.message)}</span>
                 </div>
 
                 <div>
@@ -45,10 +63,9 @@ export function renderApprovalLog(container) {
 
                 <div>
                     <strong>Handling</strong>
-                    <span>${escapeHtml(entry.action || "-")}</span>
+                    <span>${escapeHtml(entry.action)}</span>
                 </div>
             </div>
         `;
     }).join("");
 }
-

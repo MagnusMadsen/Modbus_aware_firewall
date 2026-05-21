@@ -1,8 +1,7 @@
+import { approveDevice, blockDevice, ignoreDevice, saveAlertApproval } from "./api.js";
 import { acknowledgeAlert, saveApprovalLogEntry } from "./alertStore.js";
 import { escapeHtml } from "./utils/html.js";
 import { findNextAlert } from "./alertRules.js";
-import { approveDevice, blockDevice, ignoreDevice, saveAlertApproval } from "./api.js";
-
 
 let activeAlertKey = null;
 
@@ -34,7 +33,7 @@ export function renderApprovalModal(dashboardData, onHandled) {
                 </p>
 
                 <div class="approval-details">
-                    ${alert.details.map((item) => `
+                    ${(alert.details || []).map((item) => `
                         <div class="approval-detail">
                             <span>${escapeHtml(item.label)}</span>
                             <strong>${escapeHtml(item.value)}</strong>
@@ -92,19 +91,3 @@ async function handleAlert(alert, action) {
     await saveAlertApproval(payload);
     acknowledgeAlert(alert.key);
 }
-
-
-async function handleAlert(alert, action) {
-    saveApprovalLogEntry(alert, action);
-
-    if (alert.type === "device" && alert.deviceId) {
-        if (action === "approve") await approveDevice(alert.deviceId);
-        if (action === "block") await blockDevice(alert.deviceId);
-        if (action === "ignore") await ignoreDevice(alert.deviceId);
-        return;
-    }
-
-    acknowledgeAlert(alert.key);
-}
-
-

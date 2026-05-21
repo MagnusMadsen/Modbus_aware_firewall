@@ -67,19 +67,28 @@ function focusChartOnEvent(timeString) {
     }
 }
 
+function safeRender(name, callback) {
+    try {
+        callback();
+    } catch (error) {
+        console.error(`Render failed: ${name}`, error);
+    }
+}
+
 function renderAll() {
     const dashboardData = getState().dashboardData;
-    renderHeader(dashboardData);
-    renderSummary(elements.summaryGrid, dashboardData);
-    renderConnections(elements.connectionGroups, dashboardData);
-    renderEvents(elements.eventList, dashboardData, focusChartOnEvent);
-    renderArp(elements.arp, dashboardData);
-    renderPorts(elements.portsGrid, dashboardData);
-    renderChart(elements.chartShell, dashboardData, renderAll);
 
-    renderApprovalModal(dashboardData, refreshDashboardData);
-    renderApprovalLog(elements.approvalLogList);
+    safeRender("header", () => renderHeader(dashboardData));
+    safeRender("summary", () => renderSummary(elements.summaryGrid, dashboardData));
+    safeRender("connections", () => renderConnections(elements.connectionGroups, dashboardData));
+    safeRender("events", () => renderEvents(elements.eventList, dashboardData, focusChartOnEvent));
+    safeRender("arp", () => renderArp(elements.arp, dashboardData));
+    safeRender("ports", () => renderPorts(elements.portsGrid, dashboardData));
+    safeRender("chart", () => renderChart(elements.chartShell, dashboardData, renderAll));
+    safeRender("approvalModal", () => renderApprovalModal(dashboardData, refreshDashboardData));
+    safeRender("approvalLog", () => renderApprovalLog(elements.approvalLogList));
 }
+
 
 async function refreshDashboardData() {
     try {

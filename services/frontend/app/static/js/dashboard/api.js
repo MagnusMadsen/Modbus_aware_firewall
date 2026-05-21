@@ -95,6 +95,16 @@ export async function saveAlertApproval(payload) {
     return response.json();
 }
 
+export async function fetchAlertApprovals() {
+    const response = await fetch("/api/alert-approvals", {
+        cache: "no-store",
+    });
 
+    if (!response.ok) {
+        throw new Error(`Alert approvals fetch failed with status ${response.status}`);
+    }
+
+    return response.json();
+}
 
 
