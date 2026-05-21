@@ -1,3 +1,4 @@
+from storage.alerts import create_or_touch_alert
 from storage.connections import upsert_connection
 from storage.critical_registers import (
     delete_critical_register,
@@ -27,6 +28,9 @@ class StorageWriter:
 
     def insert_event(self, *args, **kwargs):
         return insert_event(*args, **kwargs)
+
+    def create_or_touch_alert(self, *args, **kwargs):
+        return create_or_touch_alert(*args, **kwargs)
 
     def insert_metrics_bucket(self, *args, **kwargs):
         return insert_metrics_bucket(*args, **kwargs)
