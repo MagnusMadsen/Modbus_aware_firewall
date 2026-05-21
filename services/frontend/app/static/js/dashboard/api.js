@@ -8,7 +8,6 @@ export async function fetchDashboardData() {
     return response.json();
 }
 
-
 export async function approveDevice(deviceId) {
     return postDeviceAction(deviceId, "approve");
 }
@@ -77,7 +76,49 @@ export async function deleteCriticalRegister(registerId) {
     return response.json();
 }
 
+export async function fetchPendingAlerts() {
+    const response = await fetch("/api/alerts/pending", {
+        cache: "no-store",
+    });
 
+    if (!response.ok) {
+        throw new Error(`Pending alerts fetch failed with status ${response.status}`);
+    }
+
+    return response.json();
+}
+
+export async function fetchAlertHistory() {
+    const response = await fetch("/api/alerts/history", {
+        cache: "no-store",
+    });
+
+    if (!response.ok) {
+        throw new Error(`Alert history fetch failed with status ${response.status}`);
+    }
+
+    return response.json();
+}
+
+export async function handleBackendAlert(alertId, action) {
+    const response = await fetch(`/api/alerts/${alertId}/handle`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        cache: "no-store",
+        body: JSON.stringify({ action }),
+    });
+
+    if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(errorBody.error || `Alert ${action} failed with status ${response.status}`);
+    }
+
+    return response.json();
+}
+
+// Legacy compatibility helpers. The active dashboard flow uses /api/alerts/*.
 export async function saveAlertApproval(payload) {
     const response = await fetch("/api/alert-approvals", {
         method: "POST",
@@ -106,5 +147,3 @@ export async function fetchAlertApprovals() {
 
     return response.json();
 }
-
-
