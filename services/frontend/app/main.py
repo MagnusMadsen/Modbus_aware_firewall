@@ -225,6 +225,52 @@ def delete_critical_register(register_id):
         return jsonify({"ok": False, "error": str(exc)}), 502
     
 
+@app.get("/api/alerts/pending")
+@login_required
+def pending_alerts():
+    try:
+        response = requests.get(
+            f"{API_BASE_URL}/api/alerts/pending",
+            headers=backend_headers(),
+            timeout=5,
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 502
+
+
+@app.get("/api/alerts/history")
+@login_required
+def alert_history():
+    try:
+        response = requests.get(
+            f"{API_BASE_URL}/api/alerts/history",
+            headers=backend_headers(),
+            timeout=5,
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 502
+
+
+@app.post("/api/alerts/<int:alert_id>/handle")
+@login_required
+def handle_alert(alert_id):
+    payload = request.get_json(silent=True) or {}
+    payload["handled_by"] = session.get("username")
+
+    try:
+        response = requests.post(
+            f"{API_BASE_URL}/api/alerts/{alert_id}/handle",
+            headers=backend_headers(),
+            json=payload,
+            timeout=5,
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 502
+
+
 @app.get("/api/alert-approvals")
 @login_required
 def alert_approvals():
