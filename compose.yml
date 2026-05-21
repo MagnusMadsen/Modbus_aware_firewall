@@ -69,7 +69,7 @@ services:
       SWITCH_IP: ${SWITCH_IP}
       SNMP_COMMUNITY_FILE: /run/secrets/snmp_community
       SNMP_VERSION: ${SNMP_VERSION}
-      volumes:
+    volumes:
       - ./services/backend:/app
       - ./services/db/migrations:/db-migrations:ro
       - ./data/logs/backend:/app/logs
