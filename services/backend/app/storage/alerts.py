@@ -1,6 +1,7 @@
 import json
 
 from storage.base import execute, query_all, query_one
+from storage.devices import update_device_status
 
 
 ACTION_TO_STATUS = {
@@ -158,6 +159,10 @@ def handle_alert(alert_id, action, handled_by=None):
     if status is None:
         raise ValueError("invalid action")
 
+    alert = get_alert(alert_id)
+    if not alert or alert.get("status") != "pending":
+        return False
+
     affected_rows = execute(
         """
         UPDATE alerts
@@ -172,6 +177,9 @@ def handle_alert(alert_id, action, handled_by=None):
         """,
         (status, action, handled_by, alert_id),
     )
+
+    if affected_rows > 0 and alert.get("device_id"):
+        update_device_status(alert["device_id"], status)
 
     return affected_rows > 0
 
