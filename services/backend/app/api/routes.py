@@ -8,8 +8,9 @@ from storage import (
     list_critical_registers,
     save_critical_register,
 )
-from storage.devices import update_device_status
+from storage.alerts import handle_alert, list_alert_history, list_pending_alerts
 from storage.approvals import list_alert_approvals, save_alert_approval
+from storage.devices import update_device_status
 
 api_bp = Blueprint("api", __name__)
 
@@ -78,6 +79,37 @@ def api_update_device_status(device_id, action):
 
     return jsonify({"status": "ok"})
 
+
+@api_bp.get("/api/alerts/pending")
+@require_api_token
+def api_pending_alerts():
+    return jsonify(list_pending_alerts())
+
+
+@api_bp.get("/api/alerts/history")
+@require_api_token
+def api_alert_history():
+    return jsonify(list_alert_history())
+
+
+@api_bp.post("/api/alerts/<int:alert_id>/handle")
+@require_api_token
+def api_handle_alert(alert_id):
+    payload = request.get_json(silent=True) or {}
+    action = payload.get("action")
+    handled_by = payload.get("handled_by")
+
+    if action not in {"approve", "block", "ignore"}:
+        return jsonify({"error": "invalid action"}), 400
+
+    updated = handle_alert(alert_id, action, handled_by)
+    if not updated:
+        return jsonify({"error": "alert not found or already handled"}), 404
+
+    return jsonify({"status": "ok"})
+
+
+# Legacy compatibility endpoints. The active dashboard flow uses /api/alerts/*.
 @api_bp.get("/api/alert-approvals")
 @require_api_token
 def api_alert_approvals():
@@ -101,4 +133,3 @@ def api_save_alert_approval():
 
     save_alert_approval(payload)
     return jsonify({"status": "ok"})
-
