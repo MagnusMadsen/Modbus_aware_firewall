@@ -96,6 +96,48 @@ def get_devices():
         """
     )
 
+
+def get_stale_slave_rows(stale_seconds=30):
+    return query_all(
+        """
+        SELECT
+            id,
+            ip::text AS ip,
+            mac,
+            role,
+            status,
+            TO_CHAR(first_seen, 'YYYY-MM-DD HH24:MI:SS') AS first_seen,
+            TO_CHAR(last_seen, 'YYYY-MM-DD HH24:MI:SS') AS last_seen,
+            ROUND(EXTRACT(EPOCH FROM (NOW() - last_seen)))::int AS seconds_since_seen
+        FROM devices
+        WHERE role = 'slave'
+          AND status IN ('pending', 'approved')
+          AND last_seen < NOW() - (%s * INTERVAL '1 second')
+        ORDER BY last_seen ASC
+        """,
+        (stale_seconds,),
+    )
+
+
+def get_stale_connection_rows(stale_seconds=30):
+    return query_all(
+        """
+        SELECT
+            master_ip::text AS master_ip,
+            slave_ip::text AS slave_ip,
+            COALESCE(unit_id, 0) AS unit_id,
+            request_count,
+            TO_CHAR(first_seen, 'YYYY-MM-DD HH24:MI:SS') AS first_seen,
+            TO_CHAR(last_seen, 'YYYY-MM-DD HH24:MI:SS') AS last_seen,
+            ROUND(EXTRACT(EPOCH FROM (NOW() - last_seen)))::int AS seconds_since_seen
+        FROM observed_connections
+        WHERE last_seen < NOW() - (%s * INTERVAL '1 second')
+        ORDER BY last_seen ASC
+        """,
+        (stale_seconds,),
+    )
+
+
 def get_chart_event_rows():
     return query_all(
         """
@@ -129,4 +171,3 @@ def get_connection_rows():
         ORDER BY master_ip, slave_ip, unit_id
         """
     )
-
