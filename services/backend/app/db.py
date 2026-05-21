@@ -1,7 +1,7 @@
-# formål: 
+# formål:
 #   1. Oprette PostgreSQL-forbindelser
-#   2. Kontrollere at database-schemaet er klar ved backend startup
-#   3. 
+#   2. Køre database-migrations ved backend startup
+#   3. Kontrollere at database-schemaet er klar
 
 import glob
 import hashlib
@@ -21,6 +21,7 @@ REQUIRED_TABLES = {
     "metrics_bucket",
     "critical_registers",
     "alert_approvals",
+    "alerts",
 }
 
 MIGRATIONS_DIR = os.getenv("DB_MIGRATIONS_DIR", "/db-migrations")
@@ -96,8 +97,7 @@ def run_migrations():
 
     try:
         cur = conn.cursor()
-
-        cur.execute("SELECT pg_advisory_lock(502502);")
+        cur.execute("SELECT pg_advisory_xact_lock(502502);")
 
         ensure_migration_table(cur)
         applied = get_applied_migrations(cur)
@@ -129,7 +129,6 @@ def run_migrations():
                 ),
             )
 
-        cur.execute("SELECT pg_advisory_unlock(502502);")
         conn.commit()
 
     except Exception:
@@ -173,4 +172,3 @@ def verify_schema():
         if cur is not None:
             cur.close()
         conn.close()
-
