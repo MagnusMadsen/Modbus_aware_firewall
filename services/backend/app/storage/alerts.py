@@ -42,6 +42,9 @@ def create_or_touch_alert(
         DO UPDATE SET
             message = EXCLUDED.message,
             severity = EXCLUDED.severity,
+            source_ip = EXCLUDED.source_ip,
+            target_ip = EXCLUDED.target_ip,
+            device_id = EXCLUDED.device_id,
             details = EXCLUDED.details,
             updated_at = NOW()
         WHERE alerts.status = 'pending'
@@ -57,6 +60,34 @@ def create_or_touch_alert(
             device_id,
             json.dumps(details or {}),
         ),
+    )
+
+
+def get_alert(alert_id):
+    return query_one(
+        """
+        SELECT
+            id,
+            alert_key,
+            alert_type,
+            title,
+            message,
+            severity,
+            source_ip::text AS source_ip,
+            target_ip::text AS target_ip,
+            device_id,
+            details,
+            status,
+            action,
+            handled_by,
+            TO_CHAR(handled_at, 'YYYY-MM-DD HH24:MI:SS') AS handled_at,
+            TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') AS created_at,
+            TO_CHAR(updated_at, 'YYYY-MM-DD HH24:MI:SS') AS updated_at
+        FROM alerts
+        WHERE id = %s
+        LIMIT 1
+        """,
+        (alert_id,),
     )
 
 
