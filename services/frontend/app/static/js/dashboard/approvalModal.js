@@ -1,4 +1,3 @@
-import { approveDevice, blockDevice, ignoreDevice } from "./api.js";
 import { acknowledgeAlert, saveApprovalLogEntry } from "./alertStore.js";
 import { escapeHtml } from "./utils/html.js";
 import { findNextAlert } from "./alertRules.js";
