@@ -1,4 +1,3 @@
-
 import { isAlertAcknowledged } from "./alertStore.js";
 
 export function findNextAlert(dashboardData) {
@@ -55,6 +54,7 @@ function findArpAlert(dashboardData) {
     return {
         type: "arp",
         key,
+        eventId: event.event_id || null,
         title: "ARP MAC ÆNDRING",
         message: "En IP-adresse har skiftet MAC-adresse. Dette kan indikere MITM eller ARP spoofing.",
         approveText: "GODKEND HÆNDELSE",

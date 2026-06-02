@@ -43,6 +43,7 @@ def get_recent_event_rows(limit=20):
     return query_all(
         """
         SELECT
+            id,
             TO_CHAR(ts, 'YYYY-MM-DD HH24:MI:SS') AS time,
             event_type,
             severity,
@@ -66,6 +67,7 @@ def get_arp_event_rows(limit=4):
     return query_all(
         """
         SELECT
+            id,
             TO_CHAR(ts, 'YYYY-MM-DD HH24:MI:SS') AS time,
             event_type,
             source_ip::text AS source_ip,
@@ -129,4 +131,3 @@ def get_connection_rows():
         ORDER BY master_ip, slave_ip, unit_id
         """
     )
-

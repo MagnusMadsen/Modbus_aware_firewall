@@ -78,6 +78,7 @@ def build_recent_events(rows):
 
         events.append(
             {
+                "event_id": row.get("id"),
                 "type": row["event_type"],
                 "time": row["time"],
                 "severity": row["severity"],
@@ -104,6 +105,7 @@ def build_arp_monitor(rows):
 
         events.append(
             {
+                "event_id": row.get("id"),
                 "type": event_label,
                 "severity": "high",
                 "details": f"{row['source_ip']} changed MAC from {row['old_value']} to {row['new_value']}",

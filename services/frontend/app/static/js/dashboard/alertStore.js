@@ -19,7 +19,7 @@ export function hydrateApprovalStore(dashboardData) {
         handledBy: entry.handled_by,
         handledAt: entry.handled_at,
     }));
-}
+}s
 
 
 export function isAlertAcknowledged(alertKey) {
@@ -37,6 +37,7 @@ export function buildApprovalPayload(alert, action) {
         alarm_key: alert.key,
         alarm_type: alert.type,
         action,
+        event_id: alert.eventId || null,
         details: {
             title: alert.title,
             message: alert.message,
