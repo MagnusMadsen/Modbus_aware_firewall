@@ -3,6 +3,7 @@ class RegisterTracker:
         self.writer = writer
         self.learning_mode = learning_mode
         self.register_state = {}
+        self.last_event_id = {}
 
     def process_changes(self, data):
         function_code = data.get("function_code")
@@ -36,7 +37,7 @@ class RegisterTracker:
                 self.writer.upsert_register_state(slave_ip, unit_id, register_type, address, value)
 
                 if not self.learning_mode() or classification["is_pinned"]:
-                    self.writer.insert_event(
+                    event_id = self.writer.insert_event(
                         event_type="new_register_observed",
                         severity=classification["severity"] if classification["is_pinned"] else "info",
                         source_ip=data.get("src_ip"),
@@ -53,13 +54,14 @@ class RegisterTracker:
                             "critical_label": classification["critical_label"],
                         },
                     )
+                    self.last_event_id[state_key] = event_id
                 continue
 
             if old_value != value:
                 self.register_state[state_key] = value
                 self.writer.upsert_register_state(slave_ip, unit_id, register_type, address, value)
 
-                self.writer.insert_event(
+                event_id = self.writer.insert_event(
                     event_type="register_value_changed",
                     severity=classification["severity"],
                     source_ip=data.get("src_ip"),
@@ -77,6 +79,7 @@ class RegisterTracker:
                         "critical_label": classification["critical_label"],
                     },
                 )
+                self.last_event_id[state_key] = event_id
 
     def _classify_register_change(self, slave_ip, unit_id, register_type, register_address, new_value):
         critical = self.writer.get_critical_register(

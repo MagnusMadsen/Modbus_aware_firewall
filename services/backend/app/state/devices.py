@@ -41,7 +41,7 @@ class DeviceTracker:
                 self.writer.upsert_device(ip, normalized_mac, normalized_role)
 
                 if not self.learning_mode():
-                    self.writer.insert_event(
+                    event_id = self.writer.insert_event(
                         event_type="new_device",
                         severity="info",
                         source_ip=ip,
@@ -51,6 +51,7 @@ class DeviceTracker:
                             "role": normalized_role,
                         },
                     )
+                    self.known_devices[ip]["last_event_id"] = event_id
 
                 self.last_sql_touch[ip] = current_time
                 return
@@ -68,7 +69,7 @@ class DeviceTracker:
         )
 
         if mac_changed:
-            self.writer.insert_event(
+            event_id = self.writer.insert_event(
                 event_type="identity_mac_changed",
                 severity="high",
                 source_ip=ip,
@@ -83,10 +84,11 @@ class DeviceTracker:
                     "pin_reason": "IP/MAC identity changed",
                 },
             )
+            existing["last_event_id"] = event_id
             existing["mac"] = normalized_mac
 
         if role_changed:
-            self.writer.insert_event(
+            event_id = self.writer.insert_event(
                 event_type="identity_role_changed",
                 severity="high",
                 source_ip=ip,
@@ -101,6 +103,7 @@ class DeviceTracker:
                     "pin_reason": "Device role changed",
                 },
             )
+            existing["last_event_id"] = event_id
 
         existing["role"] = merged_role
         existing["last_seen"] = current_time

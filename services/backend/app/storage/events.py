@@ -1,6 +1,6 @@
 from psycopg2.extras import Json
 
-from storage.base import execute
+from storage.base import query_one
 
 
 def insert_event(
@@ -16,13 +16,14 @@ def insert_event(
     new_value=None,
     details=None,
 ):
-    execute(
+    row = query_one(
         """
         INSERT INTO events
             (ts, event_type, severity, source_ip, target_ip, unit_id, function_code,
              register_type, register_address, old_value, new_value, details)
         VALUES
             (NOW(), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
         """,
         (
             event_type,
@@ -38,3 +39,5 @@ def insert_event(
             Json(details or {}),
         ),
     )
+
+    return row["id"] if row else None
