@@ -19,7 +19,7 @@ export function hydrateApprovalStore(dashboardData) {
         handledBy: entry.handled_by,
         handledAt: entry.handled_at,
     }));
-}s
+}
 
 
 export function isAlertAcknowledged(alertKey) {
