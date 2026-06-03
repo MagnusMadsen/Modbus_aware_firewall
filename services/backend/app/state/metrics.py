@@ -65,5 +65,39 @@ class MetricsTracker:
             active_connections=active_connections,
         )
 
+        bucket_label = self.bucket_ts.isoformat()
+
+        if self.current["traffic_count"] == 0:
+            self.writer.insert_event(
+                event_type="downtime",
+                severity="high",
+                details={
+                    "message": "No traffic observed in metrics bucket",
+                    "bucket_ts": bucket_label,
+                    "traffic_count": self.current["traffic_count"],
+                    "request_count": self.current["request_count"],
+                    "response_count": self.current["response_count"],
+                    "failed_count": self.current["failed_count"],
+                    "is_pinned": True,
+                    "pin_reason": "Traffic count was zero in this bucket",
+                },
+            )
+
+        if self.current["failed_count"] > 0:
+            self.writer.insert_event(
+                event_type="failed_requests",
+                severity="high",
+                details={
+                    "message": "Failed Modbus requests observed in metrics bucket",
+                    "bucket_ts": bucket_label,
+                    "traffic_count": self.current["traffic_count"],
+                    "request_count": self.current["request_count"],
+                    "response_count": self.current["response_count"],
+                    "failed_count": self.current["failed_count"],
+                    "is_pinned": True,
+                    "pin_reason": "One or more failed requests were observed",
+                },
+            )
+
         self.bucket_ts = current_bucket
         self.current = self._new_bucket()

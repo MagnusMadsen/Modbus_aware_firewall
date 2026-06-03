@@ -26,15 +26,23 @@ def get_metric_rows():
     return query_all(
         """
         SELECT
-            bucket_ts,
-            TO_CHAR(bucket_ts, 'HH24:MI:SS') AS time,
-            traffic_count AS traffic,
-            COALESCE(avg_latency_ms, 0) AS latency,
-            failed_count AS failed_requests,
-            CASE WHEN traffic_count = 0 THEN TRUE ELSE FALSE END AS downtime
-        FROM metrics_bucket
-        WHERE bucket_ts >= NOW() - INTERVAL '30 minutes'
-        ORDER BY bucket_ts
+            mb.bucket_ts,
+            TO_CHAR(mb.bucket_ts, 'HH24:MI:SS') AS time,
+            mb.traffic_count AS traffic,
+            COALESCE(mb.avg_latency_ms, 0) AS latency,
+            mb.failed_count AS failed_requests,
+            CASE WHEN mb.traffic_count = 0 THEN TRUE ELSE FALSE END AS downtime,
+            downtime_event.id AS downtime_event_id,
+            failed_event.id AS failed_event_id
+        FROM metrics_bucket mb
+        LEFT JOIN events downtime_event
+            ON downtime_event.event_type = 'downtime'
+            AND (downtime_event.details->>'bucket_ts')::timestamp = mb.bucket_ts
+        LEFT JOIN events failed_event
+            ON failed_event.event_type = 'failed_requests'
+            AND (failed_event.details->>'bucket_ts')::timestamp = mb.bucket_ts
+        WHERE mb.bucket_ts >= NOW() - INTERVAL '30 minutes'
+        ORDER BY mb.bucket_ts
         """
     )
 

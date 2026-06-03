@@ -25,6 +25,8 @@ def build_combined_series(rows):
                 "latency_threshold": latency_threshold,
                 "failed_requests": row["failed_requests"] or 0,
                 "downtime": bool(row["downtime"]),
+                "downtime_event_id": row.get("downtime_event_id"),
+                "failed_event_id": row.get("failed_event_id"),
             }
         )
 

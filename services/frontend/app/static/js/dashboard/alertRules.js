@@ -4,6 +4,7 @@ export function findNextAlert(dashboardData) {
     return (
         findPendingDeviceAlert(dashboardData) ||
         findArpAlert(dashboardData) ||
+        findEventAlert(dashboardData) ||
         findDowntimeAlert(dashboardData) ||
         findFailedRequestAlert(dashboardData) ||
         findLatencyAlert(dashboardData) ||
@@ -69,6 +70,45 @@ function findArpAlert(dashboardData) {
     };
 }
 
+function findEventAlert(dashboardData) {
+    const events = dashboardData.events || [];
+
+    const event = events.find((item) => {
+        const severity = String(item.severity || "").toLowerCase();
+        const isPinned = item.is_pinned === true;
+        const key = `event:${item.event_id || item.time}:${item.type}`;
+
+        return (
+            item.event_id &&
+            !isAlertAcknowledged(key) &&
+            (isPinned || severity === "high" || severity === "critical")
+        );
+    });
+
+    if (!event) return null;
+
+    const key = `event:${event.event_id}:${event.type}`;
+    if (isAlertAcknowledged(key)) return null;
+
+    return {
+        type: event.type || "event",
+        key,
+        eventId: event.event_id,
+        title: "SIKKERHEDSHÆNDELSE FUNDET",
+        message: event.impact || event.details || "Der er registreret en hændelse i IDS-systemet.",
+        approveText: "GODKEND",
+        blockText: "KRITISK",
+        ignoreText: "IGNORER",
+        details: [
+            { label: "Event ID", value: String(event.event_id) },
+            { label: "Type", value: event.type || "-" },
+            { label: "Alvorlighed", value: event.severity || "-" },
+            { label: "Tid", value: event.time || "-" },
+            { label: "Detaljer", value: event.details || "-" },
+        ],
+    };
+}
+
 function findDowntimeAlert(dashboardData) {
     const series = dashboardData.combined_series || [];
     const lastDowntime = [...series].reverse().find((item) => item.downtime === true);
@@ -81,12 +121,14 @@ function findDowntimeAlert(dashboardData) {
     return {
         type: "downtime",
         key,
+        eventId: lastDowntime.downtime_event_id || null,
         title: "NETVÆRKSUDFALD",
         message: "Der er registreret et tidsvindue uden trafik.",
         approveText: "GODKEND",
         blockText: "KRITISK",
         ignoreText: "IGNORER",
         details: [
+            { label: "Event ID", value: String(lastDowntime.downtime_event_id || "-") },
             { label: "Tid", value: lastDowntime.time || "-" },
             { label: "Traffic", value: String(lastDowntime.traffic ?? "-") },
             { label: "Failed requests", value: String(lastDowntime.failed_requests ?? "-") },
@@ -107,12 +149,14 @@ function findFailedRequestAlert(dashboardData) {
     return {
         type: "failed_requests",
         key,
+        eventId: lastFailed.failed_event_id || null,
         title: "FAILED MODBUS REQUESTS",
         message: "Der er registreret fejlede requests. Dette kan ske ved afbrydelse, bridge/MITM eller ustabil slave.",
         approveText: "GODKEND",
         blockText: "KRITISK",
         ignoreText: "IGNORER",
         details: [
+            { label: "Event ID", value: String(lastFailed.failed_event_id || "-") },
             { label: "Tid", value: lastFailed.time || "-" },
             { label: "Failed requests", value: String(lastFailed.failed_requests) },
             { label: "Traffic", value: String(lastFailed.traffic ?? "-") },
