@@ -168,6 +168,39 @@ CREATE TABLE IF NOT EXISTS critical_registers (
         ))
 );
 
+
+ALTER TABLE events
+    ADD COLUMN IF NOT EXISTS event_key TEXT;
+
+ALTER TABLE events
+    ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'open';
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'events_event_key_key'
+    ) THEN
+        ALTER TABLE events
+            ADD CONSTRAINT events_event_key_key UNIQUE (event_key);
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'chk_events_status'
+    ) THEN
+        ALTER TABLE events
+            ADD CONSTRAINT chk_events_status
+            CHECK (status IN ('open', 'approved', 'blocked', 'ignored', 'critical', 'closed'));
+    END IF;
+END $$;
+
+
 CREATE INDEX IF NOT EXISTS idx_devices_last_seen
     ON devices (last_seen DESC);
 
