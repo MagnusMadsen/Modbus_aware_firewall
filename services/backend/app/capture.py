@@ -1,11 +1,7 @@
-# Formål 
-# 1. Læs capture-konfiguration fra environment
-# 2. Sæt netværksinterfaces op
-# 3. Start packet sniffing
-# 4. For hver packet:
-#   - parse packet
-#   - send observation til state manager
-# 5. Log fejl uden at stoppe capture
+# capture.py starter selve packet capture-delen af backend.
+# Filen sætter netværksinterface op, starter Scapy sniff(), og sender hver fanget packet videre i programmet.
+# Den analyserer ikke selv Modbus-data og skriver ikke direkte til databasen.
+# Flowet er: sniffet packet -> handle_packet() -> parse_packet() -> process_observation() -> state/manager.py.
 
 import logging
 import os
@@ -18,16 +14,28 @@ from scapy.error import Scapy_Exception
 from packet_parser import parse_packet
 from state import process_observation
 
+# CAPTURE_INTERFACE er det netværksinterface der lyttes på, eth0.
+# CAPTURE_FILTER er et BPF-filter til Scapy/tcpdump-laget, så vi kun fanger ARP og TCP port 502.
+    # BPF står for Berkeley Packet Filter.
+    # Det er et lavniveau packet-filter, som begrænser hvilke pakker Scapy overhovedet modtager
+# TCP port 502 er Modbus TCP. Filteret gør capture lettere, fordi vi ikke behandler al trafik på interfacet.
 CAPTURE_INTERFACE = os.getenv("CAPTURE_INTERFACE", "eth0")
 CAPTURE_FILTER = os.getenv("CAPTURE_FILTER", "arp or tcp port 502")
 
+# SWITCH_INTERFACE bruges kun hvis backend også skal sætte et separat switch-management interface op.
+# Hvis variablen er tom, springes switch-setup over.
+# SWITCH_INTERFACE_IP er den IP backend prøver at give dette interface.
 SWITCH_INTERFACE = os.getenv("SWITCH_INTERFACE", "")
 SWITCH_INTERFACE_IP = os.getenv("SWITCH_INTERFACE_IP", "192.168.61.250/24")
 
+# Logger bruges til at vise status og fejl i backend-containerens logs.
+# Det er derfor man kan se capture-fejl med docker compose logs backend.
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-
+# run_command() kører Linux-kommandoer fra Python.
+# Den bruges her til ip link/ip addr kommandoer, når interfaces skal sættes op.
+# check=False betyder at programmet selv håndterer fejl i stedet for at crashe automatisk.
 def run_command(args: list[str]) -> subprocess.CompletedProcess:
     return subprocess.run(
         args,
@@ -37,6 +45,11 @@ def run_command(args: list[str]) -> subprocess.CompletedProcess:
     )
 
 
+# handle_packet() bliver kaldt af Scapy én gang for hver packet sniff() fanger.
+# pkt er den rå Scapy-packet.
+# parse_packet(pkt) laver pakken om til en dictionary med f.eks. src_ip, dst_ip, src_mac, dst_mac og Modbus-felter.
+# process_observation(data) sender den parsede observation videre til state-laget.
+# try/except gør at én dårlig packet ikke stopper hele capture-processen.
 def handle_packet(pkt):
     try:
         data = parse_packet(pkt)
@@ -49,11 +62,17 @@ def handle_packet(pkt):
         logger.exception("Failed to process packet")
 
 
+# run_capture() er hovedflowet for capture.
+# Først sættes switch-interface op, hvis det er konfigureret.
+# Derefter startes sniffing på CAPTURE_INTERFACE.
 def run_capture():
     setup_switch_interface()
     start_capture(CAPTURE_INTERFACE)
 
 
+# start_capture_thread() starter capture i en baggrundstråd.
+# daemon=True betyder at tråden stopper sammen med resten af backend-processen.
+# Det gør at Flask/API kan køre samtidig med at packet capture lytter i baggrunden.
 def start_capture_thread():
     thread = threading.Thread(
         target=run_capture,
@@ -63,6 +82,10 @@ def start_capture_thread():
     thread.start()
 
 
+# setup_interface() gør capture-interfacet klar.
+# ip link set <interface> up aktiverer interfacet.
+# promisc on sætter interfacet i promiscuous mode, så det kan se mere trafik end kun pakker direkte til egen MAC.
+# Det er nødvendigt når IDS'en skal overvåge spejlet OT-trafik passivt.
 def setup_interface(interface: str) -> None:
     logger.info("Setting up interface: %s", interface)
 
@@ -87,6 +110,10 @@ def setup_interface(interface: str) -> None:
     logger.info("Interface ready: %s", interface)
 
 
+# setup_switch_interface() bruges kun til et separat switch-management interface.
+# Funktionen springer over hvis SWITCH_INTERFACE ikke er sat.
+# Den sætter interfacet up og prøver at tildele SWITCH_INTERFACE_IP.
+# "File exists" accepteres, fordi IP'en allerede kan være sat fra en tidligere kørsel.
 def setup_switch_interface() -> None:
     if not SWITCH_INTERFACE:
         logger.info("No switch interface configured")
@@ -124,6 +151,12 @@ def setup_switch_interface() -> None:
     logger.info("Switch interface ready: %s %s", SWITCH_INTERFACE, SWITCH_INTERFACE_IP)
 
 
+# start_capture() starter Scapy sniffing.
+# iface bestemmer hvilket interface der lyttes på.
+# prn=handle_packet betyder at hver packet sendes til handle_packet().
+# store=False betyder at Scapy ikke gemmer alle pakker i RAM.
+# promisc=True beder Scapy om promiscuous mode under sniffing.
+# filter=CAPTURE_FILTER begrænser capture til ARP og Modbus TCP-trafik.
 def start_capture(interface: str) -> None:
     setup_interface(interface)
     logger.info("Starting sniff on interface: %s with filter: %s", interface, CAPTURE_FILTER)

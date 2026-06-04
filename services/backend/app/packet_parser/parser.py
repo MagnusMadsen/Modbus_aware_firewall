@@ -1,4 +1,10 @@
-# Top-level packet parsing flow.
+# parser.py er første sted en sniffet packet bliver lavet om til data, resten af programmet kan bruge.
+# pkt er én packet fra Scapy. Scapy deler pakken op i lag, f.eks. Ether -> IP -> TCP -> payload eller Ether -> ARP.
+# pkt.haslayer(IP) betyder: har pakken et IP-lag?
+# pkt[IP].src betyder: gå ind i IP-laget og hent source IP-adressen.
+# pkt[Ether].src/dst bruges til MAC-adresser, pkt[IP].src/dst bruges til IP-adresser, og pkt[TCP].sport/dport bruges til TCP-porte.
+# ARP har ikke et IP-lag på samme måde som TCP/IP-pakker. Derfor læses ARP-IP'er fra pkt[ARP].psrc og pkt[ARP].pdst.
+# Funktionen gemmer ikke noget i databasen. Den parser kun pakken og returnerer data videre til capture.py -> state/manager.py.
 
 from scapy.layers.inet import IP, TCP
 from scapy.layers.l2 import ARP, Ether
@@ -11,6 +17,13 @@ from packet_parser.request import decode_request_fields
 from packet_parser.response import decode_response_fields
 
 
+# parse_packet() læser pakken lag for lag og bygger en data-dictionary.
+# Først læses Ethernet-laget for MAC-adresser.
+# Hvis pakken er ARP, læses ARP-IP'er og funktionen returnerer med det samme, fordi ARP ikke indeholder TCP/Modbus.
+# Hvis pakken er IP/TCP, læses IP-adresser og TCP-porte.
+# Kun TCP-trafik hvor source eller destination port er 502 forsøges parset som Modbus TCP.
+# Hvis pakken ikke er Modbus, returneres de felter der allerede er fundet, så resten af systemet stadig kan bruge IP/MAC-data.
+# Hvis pakken slet ikke har ARP eller IP, returneres None.
 def parse_packet(pkt):
     data = base_observation(pkt)
 
@@ -82,4 +95,3 @@ def parse_packet(pkt):
     apply_decoded_fields(data, decoded)
 
     return data
-

@@ -1,6 +1,13 @@
+# devices.py holder styr på enheder, mens programmet kører.
+# Det er her IP/MAC/rolle bliver vurderet ud fra observeret trafik, før data gemmes i databasen.
+# storage/devices.py skriver til PostgreSQL, men denne fil beslutter hvornår en device skal oprettes, opdateres eller give alarm.
 from state.time_utils import now
 
 
+# DeviceTracker er den del af state-laget der holder et midlertidigt overblik over kendte enheder.
+# known_devices er programmets lokale cache, så databasen ikke skal spørges for hver eneste pakke.
+# last_sql_touch bruges til kun at opdatere databasen med mellemrum, i stedet for ved hver pakke. 
+    #(Det her var grunden til du fik overheating problemer på serveren, fordi hver pakke opdaterede databasen for den samme enhed.)
 class DeviceTracker:
     def __init__(self, writer, learning_mode, sql_touch_seconds: int):
         self.writer = writer
@@ -9,6 +16,11 @@ class DeviceTracker:
         self.known_devices = {}
         self.last_sql_touch = {}
 
+    # touch() kaldes hver gang backend ser en IP-adresse i trafikken.
+    # Det er denne funktion der afgør om enheden er ny, allerede kendt, har skiftet MAC eller har skiftet rolle.
+    # Hvis IP'en ikke findes før, gemmes den via writer.upsert_device().
+    # Hvis learning_mode er slut, oprettes der også et new_device event.
+    # 0.0.0.0 og 255.255.255.255 ignoreres, fordi de ikke er normale enheder på netværket.
     def touch(self, ip, mac=None, role=None):
         if not ip or ip in ("0.0.0.0", "255.255.255.255"):
             return
@@ -17,7 +29,7 @@ class DeviceTracker:
         normalized_mac = self._normalize_mac(mac)
         normalized_role = str(role).strip().lower() if role else None
 
-        existing = self.known_devices.get(ip)
+        existing = self.known_devices.get(ip) 
 
         if existing is None:
             db_device = self.writer.get_device_by_ip(ip)
@@ -123,11 +135,16 @@ class DeviceTracker:
             self.writer.upsert_device(ip, existing.get("mac"), existing.get("role"))
             self.last_sql_touch[ip] = current_time
 
+    # _normalize_mac() gør MAC-adresser ensartede.
+    # Den fjerner whitespace og gør bogstaver små, så samme MAC ikke behandles som to forskellige værdier.
     def _normalize_mac(self, mac):
         if not mac:
             return None
         return str(mac).strip().lower()
 
+    # _merge_role() bestemmer hvilken rolle en device skal have.
+    # Hvis enheden allerede er kendt som master eller slave, overskrives den ikke af unknown.
+    # Hvis rollen reelt skifter mellem master og slave, kan touch() oprette et identity_role_changed event.
     def _merge_role(self, current_role, new_role):
         if not new_role:
             return current_role
