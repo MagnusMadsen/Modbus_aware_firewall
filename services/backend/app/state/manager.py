@@ -123,6 +123,7 @@ class ModbusStateManager:
             return
 
         self.writer.insert_event(
+            event_key=f"new_function_code:{slave_ip}:{unit_id}:{function_code}",
             event_type="new_function_code",
             severity="info",
             source_ip=master_ip,

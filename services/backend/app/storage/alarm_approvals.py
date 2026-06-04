@@ -31,6 +31,17 @@ def save_alarm_approval(payload):
         ),
     )
 
+    event_id = payload.get("event_id")
+    if event_id is not None:
+        execute(
+            """
+            UPDATE events
+            SET status = %s
+            WHERE id = %s
+            """,
+            (payload["status"], event_id),
+        )
+
 
 def list_alarm_approvals():
     return query_all(
@@ -82,5 +93,3 @@ def get_approved_alarm_keys():
     )
 
     return [row["alarm_key"] for row in rows]
-
-

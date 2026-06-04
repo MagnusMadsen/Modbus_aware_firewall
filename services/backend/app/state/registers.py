@@ -38,6 +38,7 @@ class RegisterTracker:
 
                 if not self.learning_mode() or classification["is_pinned"]:
                     event_id = self.writer.insert_event(
+                        event_key=f"new_register_observed:{slave_ip}:{unit_id}:{register_type}:{address}",
                         event_type="new_register_observed",
                         severity=classification["severity"] if classification["is_pinned"] else "info",
                         source_ip=data.get("src_ip"),
@@ -62,6 +63,7 @@ class RegisterTracker:
                 self.writer.upsert_register_state(slave_ip, unit_id, register_type, address, value)
 
                 event_id = self.writer.insert_event(
+                    event_key=f"register_value_changed:{slave_ip}:{unit_id}:{register_type}:{address}",
                     event_type="register_value_changed",
                     severity=classification["severity"],
                     source_ip=data.get("src_ip"),

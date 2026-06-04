@@ -28,6 +28,7 @@ class ConnectionTracker:
 
             if not self.learning_mode():
                 event_id = self.writer.insert_event(
+                    event_key=f"new_connection:{master_ip}:{slave_ip}:{unit_id}",
                     event_type="new_connection",
                     severity="info",
                     source_ip=master_ip,

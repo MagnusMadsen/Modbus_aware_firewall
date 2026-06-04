@@ -62,9 +62,8 @@ def fetch_summary():
         "device_roles": [],
         "ports": ports,
         "events": recent_events,
+        "alarm_events": recent_events,
 
         "approved_alarm_keys": get_approved_alarm_keys(),
         "alarm_approvals": list_alarm_approvals(),
     }
-
-

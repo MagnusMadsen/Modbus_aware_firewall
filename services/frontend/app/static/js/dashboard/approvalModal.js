@@ -76,6 +76,11 @@ export function renderApprovalModal(dashboardData, onHandled) {
 
 
 async function handleAlert(alert, action) {
+    if (!alert.eventId) {
+        console.error("Cannot handle alert without eventId", alert);
+        return;
+    }
+
     const approvalAction = normalizeApprovalAction(alert, action);
     const approvalPayload = buildApprovalPayload(alert, approvalAction);
 

@@ -81,6 +81,7 @@ class RequestTracker:
 
         if latency_ms >= self.latency_spike_ms and not self.learning_mode():
             self.writer.insert_event(
+                event_key=f"latency_spike:{master_ip}:{slave_ip}:{unit_id}",
                 event_type="latency_spike",
                 severity="medium",
                 source_ip=master_ip,
@@ -99,6 +100,7 @@ class RequestTracker:
         if data.get("is_exception") and not self.learning_mode():
             self.metrics.count_failed()
             self.writer.insert_event(
+                event_key=f"exception_response:{master_ip}:{slave_ip}:{unit_id}:{data.get('function_code')}:{data.get('exception_code')}",
                 event_type="exception_response",
                 severity="high",
                 source_ip=master_ip,
@@ -138,6 +140,7 @@ class RequestTracker:
             self.metrics.count_failed()
 
             self.writer.insert_event(
+                event_key=f"request_timeout:{master_ip}:{slave_ip}:{unit_id}:{pending.get('function_code')}:{pending.get('register_type')}:{pending.get('register_address')}",
                 event_type="request_timeout",
                 severity="high",
                 source_ip=master_ip,

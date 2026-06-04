@@ -1,4 +1,29 @@
 from switch_monitor import get_mac_to_port_map, get_switch_ports
+from storage import get_writer
+def attach_port_events(ports):
+    writer = get_writer()
+
+    for port in ports:
+        state = str(port.get("state") or "").lower()
+        if state != "active":
+            continue
+
+        port_name = port.get("port") or port.get("name") or port.get("ifname") or "unknown"
+        event_id = writer.insert_event(
+            event_key=f"port_active:{port_name}",
+            event_type="port_active",
+            severity="medium",
+            details={
+                "message": "Switch port is active",
+                "port": port.get("port"),
+                "name": port.get("name"),
+                "state": port.get("state"),
+                "activity": port.get("activity"),
+            },
+        )
+        port["event_id"] = event_id
+
+    return ports
 
 
 def build_connection_groups(rows):
@@ -122,4 +147,5 @@ def enrich_ports_with_devices(ports, devices, connections):
 
 def build_ports(devices, connections):
     ports = get_switch_ports()
+    ports = attach_port_events(ports)
     return enrich_ports_with_devices(ports, devices, connections)

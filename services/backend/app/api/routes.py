@@ -56,11 +56,13 @@ def validate_alarm_approval_payload(payload):
     if not isinstance(details, dict):
         return None, "details must be an object"
 
-    if event_id is not None:
-        try:
-            event_id = int(event_id)
-        except (TypeError, ValueError):
-            return None, "event_id must be an integer"
+    if event_id is None:
+        return None, "event_id is required"
+
+    try:
+        event_id = int(event_id)
+    except (TypeError, ValueError):
+        return None, "event_id must be an integer"
 
     return {
         "alarm_key": alarm_key,
@@ -254,15 +256,23 @@ def api_update_device_status(device_id, action):
     alarm_key = str(payload.get("alarm_key") or "").strip()
 
     if handled_by and alarm_key:
+        event_id = payload.get("event_id")
+        if event_id is None:
+            return jsonify({"error": "event_id is required"}), 400
+
+        try:
+            event_id = int(event_id)
+        except (TypeError, ValueError):
+            return jsonify({"error": "event_id must be an integer"}), 400
+
         save_alarm_approval({
             "alarm_key": alarm_key,
             "alarm_type": "device",
             "action": action,
             "status": status,
             "handled_by": handled_by,
-            "event_id": payload.get("event_id"),
+            "event_id": event_id,
             "details": payload.get("details") or {},
         })
 
     return jsonify({"status": "ok"})
-

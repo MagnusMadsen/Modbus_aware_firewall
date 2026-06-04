@@ -42,6 +42,7 @@ class DeviceTracker:
 
                 if not self.learning_mode():
                     event_id = self.writer.insert_event(
+                        event_key=f"new_device:{ip}",
                         event_type="new_device",
                         severity="info",
                         source_ip=ip,
@@ -70,6 +71,7 @@ class DeviceTracker:
 
         if mac_changed:
             event_id = self.writer.insert_event(
+                event_key=f"identity_mac_changed:{ip}",
                 event_type="identity_mac_changed",
                 severity="high",
                 source_ip=ip,
@@ -89,6 +91,7 @@ class DeviceTracker:
 
         if role_changed:
             event_id = self.writer.insert_event(
+                event_key=f"identity_role_changed:{ip}",
                 event_type="identity_role_changed",
                 severity="high",
                 source_ip=ip,

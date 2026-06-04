@@ -21,14 +21,16 @@ function findPendingDeviceAlert(dashboardData) {
     });
 
     if (!device) return null;
+    if (!device.event_id) return null;
 
-    const key = `device:${device.id || device.ip || device.mac}`;
+    const key = `event:${device.event_id}:new_device`;
     if (isAlertAcknowledged(key)) return null;
 
     return {
         type: "device",
         key,
         deviceId: device.id,
+        eventId: device.event_id,
         title: "UKENDT ENHED FUNDET",
         message: "En ny enhed er observeret på netværket.",
         approveText: "GODKEND",
@@ -48,8 +50,9 @@ function findArpAlert(dashboardData) {
     const event = events[0];
 
     if (!event) return null;
+    if (!event.event_id) return null;
 
-    const key = `arp:${event.time}:${event.details}`;
+    const key = `event:${event.event_id}:arp`;
     if (isAlertAcknowledged(key)) return null;
 
     return {
@@ -114,8 +117,9 @@ function findDowntimeAlert(dashboardData) {
     const lastDowntime = [...series].reverse().find((item) => item.downtime === true);
 
     if (!lastDowntime) return null;
+    if (!lastDowntime.downtime_event_id) return null;
 
-    const key = `downtime:${lastDowntime.time}`;
+    const key = `event:${lastDowntime.downtime_event_id}:downtime`;
     if (isAlertAcknowledged(key)) return null;
 
     return {
@@ -142,8 +146,9 @@ function findFailedRequestAlert(dashboardData) {
     const lastFailed = [...series].reverse().find((item) => Number(item.failed_requests || 0) > 0);
 
     if (!lastFailed) return null;
+    if (!lastFailed.failed_event_id) return null;
 
-    const key = `failed:${lastFailed.time}:${lastFailed.failed_requests}`;
+    const key = `event:${lastFailed.failed_event_id}:failed_requests`;
     if (isAlertAcknowledged(key)) return null;
 
     return {
@@ -174,19 +179,22 @@ function findLatencyAlert(dashboardData) {
     });
 
     if (!spike) return null;
+    if (!spike.latency_event_id) return null;
 
-    const key = `latency:${spike.time}:${spike.latency}`;
+    const key = `event:${spike.latency_event_id}:latency`;
     if (isAlertAcknowledged(key)) return null;
 
     return {
         type: "latency",
         key,
+        eventId: spike.latency_event_id,
         title: "LATENCY OVER THRESHOLD",
         message: "Latency er over den beregnede threshold.",
         approveText: "GODKEND",
         blockText: "KRITISK",
         ignoreText: "IGNORER",
         details: [
+            { label: "Event ID", value: String(spike.latency_event_id) },
             { label: "Tid", value: spike.time || "-" },
             { label: "Latency", value: `${spike.latency} ms` },
             { label: "Threshold", value: `${spike.latency_threshold} ms` },
@@ -199,21 +207,24 @@ function findActivePortAlert(dashboardData) {
     const ports = dashboardData.ports || [];
     const activePort = ports.find((port) => {
         const state = String(port.state || "").toLowerCase();
-        const key = `port-active:${port.port}`;
+        const key = port.event_id ? `event:${port.event_id}:port_active` : `port-active:${port.port}`;
         return state === "active" && !isAlertAcknowledged(key);
     });
 
     if (!activePort) return null;
+    if (!activePort.event_id) return null;
 
     return {
         type: "port_active",
-        key: `port-active:${activePort.port}`,
+        key: `event:${activePort.event_id}:port_active`,
+        eventId: activePort.event_id,
         title: "SWITCH PORT AKTIV",
         message: "En switch-port er aktiv og skal godkendes.",
         approveText: "GODKEND PORT",
         blockText: "MARKÉR KRITISK",
         ignoreText: "IGNORER",
         details: [
+            { label: "Event ID", value: String(activePort.event_id) },
             { label: "Port", value: activePort.port || "-" },
             { label: "Interface", value: activePort.name || "-" },
             { label: "State", value: activePort.state || "-" },

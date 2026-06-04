@@ -27,6 +27,7 @@ def build_combined_series(rows):
                 "downtime": bool(row["downtime"]),
                 "downtime_event_id": row.get("downtime_event_id"),
                 "failed_event_id": row.get("failed_event_id"),
+                "latency_event_id": row.get("latency_event_id"),
             }
         )
 
@@ -43,9 +44,12 @@ def build_chart_events(rows):
 
         events.append(
             {
+                "event_id": row.get("id"),
+                "event_key": row.get("event_key"),
                 "time": row["time"],
                 "label": label,
                 "severity": row["severity"],
+                "status": row.get("status"),
             }
         )
 
@@ -81,9 +85,11 @@ def build_recent_events(rows):
         events.append(
             {
                 "event_id": row.get("id"),
+                "event_key": row.get("event_key"),
                 "type": row["event_type"],
                 "time": row["time"],
                 "severity": row["severity"],
+                "status": row.get("status"),
                 "details": " | ".join(parts) if parts else message,
                 "impact": " | ".join(impact_parts),
                 "is_pinned": is_pinned,
@@ -108,8 +114,10 @@ def build_arp_monitor(rows):
         events.append(
             {
                 "event_id": row.get("id"),
+                "event_key": row.get("event_key"),
                 "type": event_label,
                 "severity": "high",
+                "status": row.get("status"),
                 "details": f"{row['source_ip']} changed MAC from {row['old_value']} to {row['new_value']}",
                 "time": row["time"],
             }

@@ -69,6 +69,7 @@ class MetricsTracker:
 
         if self.current["traffic_count"] == 0:
             self.writer.insert_event(
+                event_key=f"downtime:{bucket_label}",
                 event_type="downtime",
                 severity="high",
                 details={
@@ -85,6 +86,7 @@ class MetricsTracker:
 
         if self.current["failed_count"] > 0:
             self.writer.insert_event(
+                event_key=f"failed_requests:{bucket_label}",
                 event_type="failed_requests",
                 severity="high",
                 details={

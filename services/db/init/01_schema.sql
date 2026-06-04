@@ -52,8 +52,10 @@ CREATE TABLE IF NOT EXISTS modbus_register_state (
 CREATE TABLE IF NOT EXISTS events (
     id BIGSERIAL PRIMARY KEY,
     ts TIMESTAMP NOT NULL DEFAULT NOW(),
+    event_key TEXT UNIQUE,
     event_type TEXT NOT NULL,
     severity TEXT NOT NULL DEFAULT 'info',
+    status TEXT NOT NULL DEFAULT 'open',
     source_ip INET,
     target_ip INET,
     unit_id INTEGER,
@@ -65,6 +67,8 @@ CREATE TABLE IF NOT EXISTS events (
     details JSONB NOT NULL DEFAULT '{}'::jsonb,
     CONSTRAINT chk_events_severity
         CHECK (severity IN ('info', 'low', 'medium', 'high', 'critical')),
+    CONSTRAINT chk_events_status
+        CHECK (status IN ('open', 'approved', 'blocked', 'ignored', 'critical', 'closed')),
     CONSTRAINT chk_events_unit_id
         CHECK (unit_id IS NULL OR unit_id BETWEEN 0 AND 255),
     CONSTRAINT chk_events_function_code
@@ -178,6 +182,12 @@ CREATE INDEX IF NOT EXISTS idx_events_ts
 
 CREATE INDEX IF NOT EXISTS idx_events_type_ts
     ON events (event_type, ts DESC);
+
+CREATE INDEX IF NOT EXISTS idx_events_key
+    ON events (event_key);
+
+CREATE INDEX IF NOT EXISTS idx_events_status_ts
+    ON events (status, ts DESC);
 
 CREATE INDEX IF NOT EXISTS idx_metrics_bucket_ts
     ON metrics_bucket (bucket_ts DESC);

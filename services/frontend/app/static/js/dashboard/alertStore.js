@@ -10,6 +10,7 @@ export function hydrateApprovalStore(dashboardData) {
     approvalLogEntries = (dashboardData.alarm_approvals || []).map((entry) => ({
         id: entry.id,
         alertKey: entry.alarm_key,
+        eventId: entry.event_id,
         type: entry.alarm_type,
         title: entry.details?.title || entry.alarm_type,
         message: entry.details?.message || "-",
@@ -33,11 +34,15 @@ export function acknowledgeAlert(alertKey) {
 
 
 export function buildApprovalPayload(alert, action) {
+    if (!alert.eventId) {
+        throw new Error("Cannot build approval payload without eventId");
+    }
+
     return {
         alarm_key: alert.key,
         alarm_type: alert.type,
         action,
-        event_id: alert.eventId || null,
+        event_id: alert.eventId,
         details: {
             title: alert.title,
             message: alert.message,
@@ -51,6 +56,7 @@ export function saveApprovalLogEntry(alert, action) {
     const entry = {
         id: `${alert.key}:${Date.now()}`,
         alertKey: alert.key,
+        eventId: alert.eventId,
         type: alert.type,
         title: alert.title,
         message: alert.message,
