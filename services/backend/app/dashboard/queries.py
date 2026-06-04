@@ -96,7 +96,6 @@ def get_arp_event_rows(limit=4):
             new_value
         FROM events
         WHERE event_type IN ('arp_mac_changed', 'identity_mac_changed')
-            AND status = 'open'
         ORDER BY ts DESC
         LIMIT %s
         """,
