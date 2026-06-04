@@ -4,7 +4,7 @@ from config import read_secret_env
 from storage import get_user_by_username, upsert_user
 
 
-VALID_ROLES = {"admin", "operator", "viewer"}
+VALID_ROLES = {"admin", "operator"}
 
 
 def bootstrap_default_user():

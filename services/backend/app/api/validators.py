@@ -1,6 +1,15 @@
+# validators.py indeholder validering af data, før routes.py sender det videre til storage-laget.
+# Filen ændrer ikke databasen. Den kontrollerer kun input fra API-kald og returnerer enten et renset payload eller en fejltekst.
+# Her bruges den til critical_registers, så ugyldige IP'er, unit_id, registertyper og registeradresser ikke bliver gemt.
 import ipaddress
 
 
+# validate_critical_register_payload() bruges af POST /api/critical-registers i routes.py.
+# payload er JSON-data fra frontend, når brugeren opretter eller ændrer et kritisk Modbus-register.
+# Funktionen validerer slave_ip, unit_id, register_type, register_address, label, allowed_values, pin_on_change og is_enabled.
+# Hvis noget er ugyldigt, returneres None og en fejltekst.
+# Hvis alt er gyldigt, returneres et nyt dict med rensede og korrekt typede værdier.
+# ipaddress.ip_address() bruges til at validere og normalisere IP-adressen, så databasen får en korrekt IP-streng.
 def validate_critical_register_payload(payload: dict) -> tuple[dict | None, str | None]:
     try:
         slave_ip = str(ipaddress.ip_address(payload.get("slave_ip", "")))

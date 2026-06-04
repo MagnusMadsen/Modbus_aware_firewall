@@ -1,3 +1,8 @@
+# routes.py definerer backendens HTTP API-routes.
+# Frontend kalder disse endpoints for at hente dashboard-data, devices, users, critical registers og alarm approvals.
+# Filen indeholder ikke selve SQL-koden. Den validerer input, kalder storage/dashboard-funktioner og returnerer JSON-svar.
+# De fleste routes er beskyttet med @require_api_token, så frontend skal sende X-API-Token headeren.
+
 from flask import Blueprint, jsonify, request
 from werkzeug.security import check_password_hash
 
@@ -18,8 +23,12 @@ from storage import (
 )
 from storage.devices import update_device_status
 
+# Flask Blueprint samler API-routes, så main.py kan registrere dem samlet på Flask-appen.
 api_bp = Blueprint("api", __name__)
 
+# Mapper frontendens alarm-knapper til den status der gemmes i databasen.
+# Eksempel: action="approve" bliver til status="approved".
+# Denne status gemmes både i alarm_approvals og bruges til at opdatere events.status.
 ALARM_ACTION_TO_STATUS = {
     "approve": "approved",
     "block": "blocked",
@@ -27,9 +36,14 @@ ALARM_ACTION_TO_STATUS = {
     "critical": "critical",
 }
 
-USER_ROLES = {"admin", "operator", "viewer"}
+# Roller som API'et accepterer, når en bruger oprettes eller opdateres.
+USER_ROLES = {"admin", "operator"}
 
 
+# validate_alarm_approval_payload() kontrollerer data fra POST /api/alarm-approvals.
+# Den sikrer at alarm_key, alarm_type, action, handled_by, details og event_id har det format backend forventer.
+# event_id er påkrævet, fordi alarm_approvals skal kunne pege tilbage på den konkrete række i events.
+# Funktionen returnerer enten et renset payload-dict eller en fejltekst.
 def validate_alarm_approval_payload(payload):
     if not isinstance(payload, dict):
         return None, "Invalid JSON payload"
@@ -75,6 +89,8 @@ def validate_alarm_approval_payload(payload):
     }, None
 
 
+# public_user() laver en bruger-række om til et sikkert JSON-svar.
+# Password-hash returneres ikke til frontend.
 def public_user(user):
     return {
         "id": user.get("id"),
@@ -86,29 +102,39 @@ def public_user(user):
     }
 
 
+# Healthcheck uden API-token.
+# Bruges til hurtigt at se om backend-processen svarer.
 @api_bp.get("/health")
 def health():
     return jsonify({"status": "ok", "service": "backend"})
 
 
+# Returnerer samlet dashboard-data.
+# fetch_summary() bygger svaret fra metrics, devices, events, ports, connections og alarm approvals.
 @api_bp.get("/api/dashboard")
 @require_api_token
 def api_dashboard():
     return jsonify(fetch_summary())
 
 
+# Returnerer devices-listen til frontend.
+# Data hentes via fetch_devices(), som læser fra devices-tabellen gennem dashboard-laget.
 @api_bp.get("/api/devices")
 @require_api_token
 def api_devices():
     return jsonify(fetch_devices())
 
 
+# Returnerer gemte alarm approvals.
+# Bruges af frontend til at vide hvilke alarmer brugeren allerede har håndteret.
 @api_bp.get("/api/alarm-approvals")
 @require_api_token
 def api_alarm_approvals():
     return jsonify(list_alarm_approvals())
 
 
+# Returnerer kun alarm keys for håndterede alarmer.
+# Det er et letvægts-endpoint, så frontend hurtigt kan filtrere alarmer der allerede er behandlet.
 @api_bp.get("/api/approved-alarm-keys")
 @require_api_token
 def api_approved_alarm_keys():
@@ -117,6 +143,9 @@ def api_approved_alarm_keys():
     })
 
 
+# Gemmer brugerens beslutning på en alarm.
+# Payload valideres først, og derefter gemmer save_alarm_approval() beslutningen i alarm_approvals.
+# save_alarm_approval() opdaterer også events.status ud fra event_id.
 @api_bp.post("/api/alarm-approvals")
 @require_api_token
 def api_save_alarm_approval():
@@ -130,12 +159,16 @@ def api_save_alarm_approval():
     return jsonify({"status": "ok"})
 
 
+# Returnerer brugere til administrationsdelen af frontend.
 @api_bp.get("/api/users")
 @require_api_token
 def api_users():
     return jsonify(list_users())
 
 
+# Opretter eller opdaterer en bruger.
+# API'et validerer username, role og is_active før upsert_user() skriver til databasen.
+# Password-hash forventes allerede at være hashet, når det sendes til dette endpoint.
 @api_bp.post("/api/users")
 @require_api_token
 def api_save_user():
@@ -168,6 +201,9 @@ def api_save_user():
     return jsonify({"status": "ok"})
 
 
+# Login-endpoint for dashboard-brugere.
+# Brugeren findes i app_users, password kontrolleres med check_password_hash(), og last_login opdateres ved succes.
+# Endpointet kræver stadig API-token, så login-formularen kun kan bruges af frontend der kender backend-tokenen.
 @api_bp.post("/api/auth/login")
 @require_api_token
 def api_auth_login():
@@ -205,12 +241,16 @@ def api_auth_login():
     })
 
 
+# Returnerer listen over kritiske Modbus-registre.
+# Tabellen bruges som policy for hvilke registerændringer der skal fremhæves.
 @api_bp.get("/api/critical-registers")
 @require_api_token
 def api_critical_registers():
     return jsonify(list_critical_registers())
 
 
+# Opretter eller opdaterer et kritisk register.
+# validate_critical_register_payload() sikrer at IP, unit_id, register_type og register_address er gyldige før data gemmes.
 @api_bp.post("/api/critical-registers")
 @require_api_token
 def api_save_critical_register():
@@ -226,6 +266,7 @@ def api_save_critical_register():
     return jsonify({"status": "ok"})
 
 
+# Sletter et kritisk register ud fra dets id.
 @api_bp.delete("/api/critical-registers/<int:register_id>")
 @require_api_token
 def api_delete_critical_register(register_id):
@@ -233,6 +274,10 @@ def api_delete_critical_register(register_id):
     return jsonify({"status": "ok"})
 
 
+# Ændrer status på en device-række, f.eks. approve, block eller ignore.
+# Først opdateres devices.status via update_device_status().
+# Hvis payload også indeholder handled_by og alarm_key, gemmes brugerens beslutning som alarm approval.
+# event_id er påkrævet i approval-flowet, så device-beslutningen kan kobles til den oprindelige event.
 @api_bp.post("/api/devices/<int:device_id>/<action>")
 @require_api_token
 def api_update_device_status(device_id, action):

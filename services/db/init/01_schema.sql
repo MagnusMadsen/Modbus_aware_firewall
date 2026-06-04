@@ -141,7 +141,7 @@ CREATE TABLE IF NOT EXISTS app_users (
     last_login TIMESTAMP,
 
     CONSTRAINT chk_app_users_role
-        CHECK (role IN ('admin', 'operator', 'viewer'))
+        CHECK (role IN ('admin', 'operator'))
 );
 
 -- Alarm_approvals gemmer brugerens beslutning på en alarm.
