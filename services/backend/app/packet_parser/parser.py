@@ -1,10 +1,32 @@
 # parser.py er første sted en sniffet packet bliver lavet om til data, resten af programmet kan bruge.
 # pkt er én packet fra Scapy. Scapy deler pakken op i lag, f.eks. Ether -> IP -> TCP -> payload eller Ether -> ARP.
+# Denne fil gemmer ikke noget i databasen. Den parser kun pakken og returnerer data videre til capture.py -> state-laget.
+
+# Ethernet/IP/TCP/Modbus ligger som lag inde i hinanden.
+# parser.py læser lagene i samme rækkefølge som pakken er bygget op.
+# MAC-adresser læses fra Ethernet-laget, IP-adresser fra IP/ARP-laget, TCP-porte fra TCP-laget,
+# og Modbus-data læses først inde i TCP payloaden, hvis porten er 502.
+
+# Ethernet frame ved Modbus TCP
+# ┌──────────────┬──────────────┬────────────┬───────────────┬───────────────┬──────────────────────────────────────────┐
+# │ dst MAC      │ src MAC      │ EtherType  │ IP header     │ TCP header    │ TCP payload                              │
+# └──────────────┴──────────────┴────────────┴───────────────┴───────────────┴──────────────────────────────────────────┘
+#        │              │              │              │              │
+#        │              │              │              │              └─ bytes(pkt[TCP].payload) -> parse_mbap(payload)
+#        │              │              │              └─ pkt[TCP].sport / pkt[TCP].dport
+#        │              │              └─ pkt[IP].src / pkt[IP].dst hvis pakken har IP-lag
+#        │              └─ pkt[Ether].src
+#        └─ pkt[Ether].dst
+
+# ARP-pakker stopper før IP/TCP/Modbus.
+# ARP ligger direkte efter Ethernet-laget, så ARP-IP'er læses fra pkt[ARP].psrc og pkt[ARP].pdst.
+# Derfor returnerer parseren med det samme efter ARP, fordi ARP ikke indeholder TCP payload eller Modbus.
+
+# Scapy-udtryk i denne fil:
 # pkt.haslayer(IP) betyder: har pakken et IP-lag?
 # pkt[IP].src betyder: gå ind i IP-laget og hent source IP-adressen.
-# pkt[Ether].src/dst bruges til MAC-adresser, pkt[IP].src/dst bruges til IP-adresser, og pkt[TCP].sport/dport bruges til TCP-porte.
-# ARP har ikke et IP-lag på samme måde som TCP/IP-pakker. Derfor læses ARP-IP'er fra pkt[ARP].psrc og pkt[ARP].pdst.
-# Funktionen gemmer ikke noget i databasen. Den parser kun pakken og returnerer data videre til capture.py -> state/manager.py.
+# pkt[Ether].src/dst bruges til MAC-adresser.
+# pkt[TCP].sport/dport bruges til TCP-porte.
 
 from scapy.layers.inet import IP, TCP
 from scapy.layers.l2 import ARP, Ether
@@ -18,12 +40,15 @@ from packet_parser.response import decode_response_fields
 
 
 # parse_packet() læser pakken lag for lag og bygger en data-dictionary.
-# Først læses Ethernet-laget for MAC-adresser.
-# Hvis pakken er ARP, læses ARP-IP'er og funktionen returnerer med det samme, fordi ARP ikke indeholder TCP/Modbus.
-# Hvis pakken er IP/TCP, læses IP-adresser og TCP-porte.
-# Kun TCP-trafik hvor source eller destination port er 502 forsøges parset som Modbus TCP.
-# Hvis pakken ikke er Modbus, returneres de felter der allerede er fundet, så resten af systemet stadig kan bruge IP/MAC-data.
-# Hvis pakken slet ikke har ARP eller IP, returneres None.
+# 1. base_observation(pkt) opretter standardfelter med None/False.
+# 2. Ether-laget læses først, fordi MAC-adresser ligger yderst i Ethernet-framen.
+# 3. Hvis pakken er ARP, læses ARP-IP'er og funktionen returnerer med det samme.
+# 4. Hvis pakken har IP-lag, læses src_ip og dst_ip.
+# 5. Hvis pakken har TCP-lag, læses source/destination port.
+# 6. Kun TCP-trafik på Modbus port 502 sendes videre til parse_mbap().
+# 7. Hvis MBAP-headeren er gyldig, sættes Modbus-felter som transaction_id, unit_id og function_code.
+# 8. infer_direction() afgør request/response, og request.py eller response.py dekoder resten.
+# Hvis pakken ikke er Modbus, returneres de felter der allerede er fundet, så state-laget stadig kan bruge IP/MAC-data.
 def parse_packet(pkt):
     data = base_observation(pkt)
 
