@@ -35,7 +35,13 @@
 # Byte count fortæller hvor mange bytes værdierne fylder.
 # Register values er selve registerværdierne fra slaven.
 # Hvert holding/input register fylder 2 bytes, altså 16 bit.
-# Eksempel: byte-parret 00 2A bliver med u16() til decimalværdien 42.
+
+# Eksempel på response-data efter function_code ved 3 registre:
+#        06  00 2A  00 10  00 FF
+# 06    = byte_count, altså 6 bytes registerdata
+# 00 2A = registerværdi 1 = 42
+# 00 10 = registerværdi 2 = 16
+# 00 FF = registerværdi 3 = 255
 
 # Eksempel ved function code 16: Write Multiple Registers response.
 # Masteren har sendt registerværdierne i requesten.

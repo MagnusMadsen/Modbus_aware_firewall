@@ -8,7 +8,6 @@ from storage.base import execute, query_one
 
 # get_device_by_ip() henter én enhed ud fra IP-adressen.
 # Bruges når state-laget skal vide om en IP allerede findes i devices-tabellen.
-# LIMIT 1 bruges fordi ip er UNIQUE i databasen, så der kan maksimalt være én rigtig række.
 # Funktionen returnerer None, hvis IP mangler eller ikke findes.
 def get_device_by_ip(ip):
     if not ip:
@@ -25,8 +24,7 @@ def get_device_by_ip(ip):
             first_seen,
             last_seen
         FROM devices
-        WHERE ip = %s
-        LIMIT 1 
+        WHERE ip = %s 
         """,
         (ip,),
     )

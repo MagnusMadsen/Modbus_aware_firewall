@@ -1,6 +1,30 @@
+// alertRules.js indeholder frontendens visningslogik for alarm-modalen.
+// Backend har allerede vurderet og oprettet hændelserne/events.
+// Filens formål er kun at vælge hvilken allerede modtaget backend-hændelse der skal vises først i frontend.
+
+// Dataflow:
+// Backend
+// └─ opretter events i events-tabellen og sender dashboardData via /api/dashboard og /api/devices
+//    └─ Frontend main.py henter data og leverer det til browseren via /api/live-dashboard
+//       └─ alertRules.js modtager dashboardData
+//          ├─ finder første relevante alert efter prioritet
+//          ├─ springer alerts over hvis de allerede er acknowledged lokalt
+//          └─ returnerer ét alert-objekt til modal-koden
+//             └─ modal-koden viser alerten og sender brugerens valg videre til backend
+
+// Kort sagt:
+// Backend = opdager, vurderer og gemmer hændelser.
+// alertRules.js = vælger og formaterer den hændelse brugeren skal se i modal-vinduet.
+
 import { isAlertAcknowledged } from "./alertStore.js";
 
+// findNextAlert() vælger den næste alert som frontend skal vise via dashboardData som er fra backend.
+// Funktionen gennemgår alert-typer i fast prioritet og returnerer den første der matcher.
+// Den ændrer ikke backend-data og opretter ikke nye hændelser. 
+// Hvis ingen alert skal vises, returneres null.
 export function findNextAlert(dashboardData) {
+    // || stopper ved første funktion der returnerer et alert-objekt.
+    // Det er derfor rækkefølgen her bestemmer hvilken alarm brugeren ser først.
     return (
         findPendingDeviceAlert(dashboardData) ||
         findArpAlert(dashboardData) ||
@@ -13,19 +37,32 @@ export function findNextAlert(dashboardData) {
 }
 
 
+// Finder en pending/unknown device som backend allerede har sendt til frontend.
+// Device-data kommer fra backend /api/devices og stammer fra devices-tabellen.
+// Denne funktion beslutter ikke om devicen er ny. Den vælger kun om den skal vises som modal.
+// Alerten kræver event_id, så brugerens handling kan kobles til events.id i backend.
 function findPendingDeviceAlert(dashboardData) {
+    // Hvis dashboardData.devices mangler, bruges en tom liste så funktionen ikke fejler.
     const devices = dashboardData.devices || [];
+
+    // Finder første device som backend har markeret som pending eller unknown.
     const device = devices.find((item) => {
         const status = String(item.status || "").toLowerCase();
         return status === "pending" || status === "unknown";
     });
 
+    // Ingen relevant device betyder ingen device-alert.
     if (!device) return null;
+
+    // Uden event_id kan alerten ikke kobles til en konkret events-række i backend.
     if (!device.event_id) return null;
 
+    // key bruges af alertStore.js til at huske om denne alert allerede er vist/håndteret lokalt.
     const key = `event:${device.event_id}:new_device`;
+
     if (isAlertAcknowledged(key)) return null;
 
+    // Returnerer det objekt modal-koden skal bruge til titel, tekst, knapper og detaljer.
     return {
         type: "device",
         key,
@@ -45,8 +82,14 @@ function findPendingDeviceAlert(dashboardData) {
     };
 }
 
+// Finder en ARP/MAC-change alert som backend allerede har oprettet som event.
+// ARP-events ligger i dashboardData.arp_monitor.events og kommer fra backendens events-flow.
+// Denne funktion vælger kun om eventen skal vises i modal-vinduet.
 function findArpAlert(dashboardData) {
+    // Optional chaining gør at koden ikke fejler hvis arp_monitor mangler.
     const events = dashboardData.arp_monitor?.events || [];
+
+    // Kun den første ARP-event vises som modal ad gangen.
     const event = events[0];
 
     if (!event) return null;
@@ -73,11 +116,18 @@ function findArpAlert(dashboardData) {
     };
 }
 
+// Finder generelle IDS-events fra dashboardData.events.
+// Disse events er allerede oprettet af backend og kommer fra events-tabellen via /api/dashboard.
+// Frontend viser kun pinned, high eller critical events som modal her.
+// Severity er altså bestemt af backend; denne fil bruger kun severity til UI-prioritering.
 function findEventAlert(dashboardData) {
+    // Finder første event der er vigtig nok og ikke allerede acknowledged.
     const events = dashboardData.events || [];
 
     const event = events.find((item) => {
+        // severity normaliseres til lowercase, så HIGH og high behandles ens.
         const severity = String(item.severity || "").toLowerCase();
+        // pinned events skal vises uanset om severity ikke er high/critical.
         const isPinned = item.is_pinned === true;
         const key = `event:${item.event_id || item.time}:${item.type}`;
 
@@ -112,7 +162,11 @@ function findEventAlert(dashboardData) {
     };
 }
 
+// Finder downtime-alerts i dashboardData.combined_series.
+// Backend har allerede vurderet downtime og sendt downtime_event_id med.
+// Denne funktion finder kun den nyeste downtime-alert der skal vises i frontend.
 function findDowntimeAlert(dashboardData) {
+    // reverse() bruges på en kopi, så vi finder den nyeste downtime uden at ændre originaldata.
     const series = dashboardData.combined_series || [];
     const lastDowntime = [...series].reverse().find((item) => item.downtime === true);
 
@@ -141,7 +195,11 @@ function findDowntimeAlert(dashboardData) {
     };
 }
 
+// Finder alerts for failed Modbus requests i combined_series.
+// Backendens request/metrics-logik har allerede registreret failed_requests og event_id.
+// Denne funktion vælger kun den nyeste failed-request alert til modal-visning.
 function findFailedRequestAlert(dashboardData) {
+    // Finder nyeste datapunkt hvor failed_requests er større end 0.
     const series = dashboardData.combined_series || [];
     const lastFailed = [...series].reverse().find((item) => Number(item.failed_requests || 0) > 0);
 
@@ -170,9 +228,14 @@ function findFailedRequestAlert(dashboardData) {
     };
 }
 
+// Finder latency-alerts i combined_series.
+// Backend har allerede beregnet latency, threshold og latency_event_id.
+// Frontend sammenligner værdierne for at vælge om den modtagne alert skal vises som modal.
 function findLatencyAlert(dashboardData) {
+    // Finder nyeste datapunkt hvor latency overstiger threshold.
     const series = dashboardData.combined_series || [];
     const spike = [...series].reverse().find((item) => {
+        // Værdierne konverteres til Number, fordi data fra API/JSON kan være tomme eller tekstlignende.
         const latency = Number(item.latency || 0);
         const threshold = Number(item.latency_threshold || 0);
         return threshold > 0 && latency > threshold;
@@ -203,15 +266,24 @@ function findLatencyAlert(dashboardData) {
     };
 }
 
+// Finder aktive switch-porte i dashboardData.ports.
+// Backend/dashboard-laget har allerede kombineret SNMP-portdata med event_id.
+// Denne funktion vælger kun om en aktiv port skal vises som modal.
+// Alerten kræver event_id, så brugerens handling kan gemmes som alarm approval på den konkrete events-række.
 function findActivePortAlert(dashboardData) {
+    // Finder første aktive port som ikke allerede er acknowledged lokalt.
     const ports = dashboardData.ports || [];
     const activePort = ports.find((port) => {
         const state = String(port.state || "").toLowerCase();
+        // event_id giver en stabil key bundet til backendens events.id.
+        // portnavnet bruges kun som fallback til lokalt acknowledged-check.
         const key = port.event_id ? `event:${port.event_id}:port_active` : `port-active:${port.port}`;
         return state === "active" && !isAlertAcknowledged(key);
     });
 
     if (!activePort) return null;
+
+    // Uden event_id vises port-alerten ikke, fordi alarm approvals skal kunne pege på events.id.
     if (!activePort.event_id) return null;
 
     return {

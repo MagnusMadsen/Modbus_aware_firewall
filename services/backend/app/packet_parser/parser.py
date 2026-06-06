@@ -50,12 +50,18 @@ from packet_parser.response import decode_response_fields
 # 8. infer_direction() afgør request/response, og request.py eller response.py dekoder resten.
 # Hvis pakken ikke er Modbus, returneres de felter der allerede er fundet, så state-laget stadig kan bruge IP/MAC-data.
 def parse_packet(pkt):
+    # Starter med et standard data-dict fra observation.py.
+    # Alle felter findes fra starten, men de fleste er None/False indtil parseren finder dem i pakken.
     data = base_observation(pkt)
 
+    # Ethernet-laget ligger yderst i pakken.
+    # Her hentes MAC-adresser, hvis pakken har et Ethernet-lag.
     if pkt.haslayer(Ether):
         data["src_mac"] = pkt[Ether].src
         data["dst_mac"] = pkt[Ether].dst
 
+    # ARP håndteres tidligt, fordi ARP ikke indeholder IP/TCP/Modbus på samme måde som TCP-trafik.
+    # ARP-IP'er læses fra pkt[ARP].psrc og pkt[ARP].pdst.
     if pkt.haslayer(ARP):
         data["protocol"] = "ARP"
         data["src_ip"] = pkt[ARP].psrc
@@ -63,43 +69,64 @@ def parse_packet(pkt):
         data["arp_op"] = pkt[ARP].op
         return data
 
+    # Hvis pakken hverken var ARP eller har IP-lag, kan parseren ikke bruge den videre.
     if not pkt.haslayer(IP):
         return None
 
+    # IP-laget giver src_ip og dst_ip.
+    # Disse IP'er bruges senere i state/manager.py til devices, connections og events.
     data["protocol"] = "IP"
     data["src_ip"] = pkt[IP].src
     data["dst_ip"] = pkt[IP].dst
 
+    # Ikke al IP-trafik er TCP.
+    # Hvis der ikke er TCP-lag, returneres IP/MAC-data stadig, men der parses ikke Modbus.
     if not pkt.haslayer(TCP):
         return data
 
+    # TCP-laget giver source og destination port.
+    # Portene bruges til at afgøre om pakken er Modbus TCP og senere om den er request eller response.
     data["protocol"] = "TCP"
     data["src_port"] = pkt[TCP].sport
     data["dst_port"] = pkt[TCP].dport
 
+    # Modbus TCP bruger port 502.
+    # Hvis hverken src_port eller dst_port er 502, stopper Modbus-parsingen her.
     if data["src_port"] != MODBUS_PORT and data["dst_port"] != MODBUS_PORT:
         return data
 
+    # TCP payloaden er applikationsdataen inde i TCP-pakken.
+    # Ved Modbus TCP starter payloaden med MBAP-headeren.
     payload = bytes(pkt[TCP].payload)
+    # Hvis TCP-pakken ikke har payload, er der ingen Modbus-data at parse.
     if not payload:
         return data
 
+    # parse_mbap() validerer MBAP-headeren og returnerer transaction_id, unit_id, function_code og pdu.
     mbap = parse_mbap(payload)
+    # Hvis MBAP-headeren er ugyldig, beholder vi TCP/IP-data men stopper Modbus-dekodningen.
     if mbap is None:
         return data
 
+    # raw_function_code er den function code der står i pakken.
+    # Ved exception responses kan 0x80-bitten være sat oven i den normale function code.
     raw_function_code = mbap["function_code"]
+    # 0x7F fjerner en eventuel exception-bit, så function_code kan sammenlignes med de understøttede normale codes.
     function_code = raw_function_code & 0x7F
 
+    # Hvis function code ikke er en af dem projektet parser, returneres pakken uden register-dekodning.
     if function_code not in SUPPORTED_FUNCTION_CODES:
         return data
 
+    # Her er pakken bekræftet som Modbus TCP, og fælles Modbus-felter lægges ind i data-dictet.
     data["protocol"] = "MODBUS"
     data["is_modbus"] = True
     data["transaction_id"] = mbap["transaction_id"]
     data["unit_id"] = mbap["unit_id"]
     data["function_code"] = function_code
 
+    # direction.py afgør om pakken er en request eller response.
+    # Det er nødvendigt, fordi request.py og response.py dekoder PDU-data forskelligt.
     direction = infer_direction(
         data["src_port"],
         data["dst_port"],
@@ -107,16 +134,23 @@ def parse_packet(pkt):
         mbap["pdu"],
     )
 
+    # Hvis retningen ikke kan afgøres sikkert, stoppes dybere dekodning.
+    # De Modbus-felter der allerede er fundet bliver stadig returneret.
     if direction is None:
         return data
 
     data["direction"] = direction
 
+    # Request-pakker dekodes i request.py.
+    # Response-pakker dekodes i response.py.
     if direction == "request":
         decoded = decode_request_fields(function_code, mbap["pdu"])
     else:
         decoded = decode_response_fields(raw_function_code, mbap["pdu"])
 
+    # decoded indeholder register_type, register_address, register_count, values eller exception-data.
+    # apply_decoded_fields() kopierer de felter ind i data-dictet, som sendes videre til state-laget.
     apply_decoded_fields(data, decoded)
 
+    # Returnerer én samlet observation til capture.py, som derefter sender den videre til process_observation(data).
     return data

@@ -1,7 +1,35 @@
 # capture.py starter selve packet capture-delen af backend.
 # Filen sætter netværksinterface op, starter Scapy sniff(), og sender hver fanget packet videre i programmet.
-# Den analyserer ikke selv Modbus-data og skriver ikke direkte til databasen.
-# Flowet er: sniffet packet -> handle_packet() -> parse_packet() -> process_observation() -> state/manager.py.
+# capture.py læser ikke selv Ethernet-, IP-, TCP-, MBAP- eller Modbus-felter.
+# Den modtager en rå Scapy-packet fra sniff(), sender den til packet_parser/parser.py, og sender derefter parserens data-dict videre til state-laget.
+#
+# Flowet i denne fil:
+# start_capture_thread()
+# └─ run_capture()
+#    ├─ setup_switch_interface()
+#    └─ start_capture(CAPTURE_INTERFACE)
+#       └─ sniff(..., prn=handle_packet, filter=CAPTURE_FILTER)
+#          └─ handle_packet(pkt)
+#             ├─ parse_packet(pkt)
+#             └─ process_observation(data)
+#                └─ state/manager.py behandler observationen videre
+#
+# Hele pakken som Scapy fanger kan forstås sådan her hvilket også bliver refereret i packet_parser/parser.py:
+# Ethernet frame
+# ┌──────────────┬──────────────┬────────────┬───────────────┬───────────────┬──────────────────────────────────────────┐
+# │ dst MAC      │ src MAC      │ EtherType  │ IP header     │ TCP header    │ TCP payload                              │
+# └──────────────┴──────────────┴────────────┴───────────────┴───────────────┴──────────────────────────────────────────┘
+#                                                                                  │
+#                                                                                  ▼
+#             TCP payload ved Modbus TCP
+#             ┌──────────────────────────── MBAP header ────────────────────────────┬────────────── Modbus PDU ──────────────┐
+#             │ Transaction ID │ Protocol ID │ Length │ Unit ID │ Function Code     │ Data                                   │
+#             │ 2 bytes        │ 2 bytes     │ 2 bytes│ 1 byte  │ 1 byte            │ Modbus-data efter function code        │
+#             └────────────────┴─────────────┴────────┴─────────┴───────────────────┴────────────────────────────────────────┘
+#
+# Vigtigt: capture.py ser kun den rå packet som pkt.
+# packet_parser/parser.py er filen der læser lagene individuelt: pkt[Ether], pkt[ARP], pkt[IP], pkt[TCP] og bytes(pkt[TCP].payload).
+# capture.py fungerer derfor som indgangen til pipeline: fang packet -> parser packet -> send observation videre.
 
 import logging
 import os
@@ -14,11 +42,12 @@ from scapy.error import Scapy_Exception
 from packet_parser import parse_packet
 from state import process_observation
 
-# CAPTURE_INTERFACE er det netværksinterface der lyttes på, eth0.
-# CAPTURE_FILTER er et BPF-filter til Scapy/tcpdump-laget, så vi kun fanger ARP og TCP port 502.
-    # BPF står for Berkeley Packet Filter.
-    # Det er et lavniveau packet-filter, som begrænser hvilke pakker Scapy overhovedet modtager
-# TCP port 502 er Modbus TCP. Filteret gør capture lettere, fordi vi ikke behandler al trafik på interfacet.
+#
+# CAPTURE_INTERFACE er det netværksinterface der lyttes på. Standard er eth0.
+# CAPTURE_FILTER er et BPF-filter til Scapy/libpcap-laget.
+# BPF står for Berkeley Packet Filter.
+# Filteret begrænser hvilke pakker Scapy modtager fra interfacet, før Python-koden behandler dem.
+# Her fanges kun ARP og TCP port 502, fordi ARP bruges til IP/MAC-observationer, og TCP port 502 er Modbus TCP.
 CAPTURE_INTERFACE = os.getenv("CAPTURE_INTERFACE", "eth0")
 CAPTURE_FILTER = os.getenv("CAPTURE_FILTER", "arp or tcp port 502")
 
@@ -52,10 +81,15 @@ def run_command(args: list[str]) -> subprocess.CompletedProcess:
 # try/except gør at én dårlig packet ikke stopper hele capture-processen.
 def handle_packet(pkt):
     try:
+        # parse_packet() er første sted hvor den rå packet bliver læst lag for lag.
+        # Resultatet er et data-dict med f.eks. src_ip, dst_ip, protocol, direction, unit_id og function_code.
         data = parse_packet(pkt)
+        # None betyder at parseren ikke kunne bruge pakken, f.eks. hvis den hverken var ARP eller IP.
         if data is None:
             return
 
+        # Sender den parsede observation videre til state/__init__.py.
+        # Derfra går den videre til ModbusStateManager.process(data).
         process_observation(data)
 
     except Exception:
@@ -162,6 +196,8 @@ def start_capture(interface: str) -> None:
     logger.info("Starting sniff on interface: %s with filter: %s", interface, CAPTURE_FILTER)
 
     try:
+        # sniff() er Scapy-funktionen der lytter live på interfacet.
+        # For hver packet der matcher CAPTURE_FILTER, kalder Scapy handle_packet(pkt).
         sniff(
             iface=interface,
             prn=handle_packet,

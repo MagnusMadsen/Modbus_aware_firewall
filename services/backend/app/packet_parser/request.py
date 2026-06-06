@@ -32,8 +32,20 @@
 # │ Start address    │ Quantity       │
 # │ 2 bytes          │ 2 bytes        │
 # └──────────────────┴────────────────┘
-# Start address er første registeradresse masteren vil læse fra. 
+# Start address er første registeradresse masteren vil læse fra.
 # Quantity er hvor mange registre masteren vil læse.
+
+# Eksempel på request-data efter function_code ved læsning af ét register:
+#           00 09  00 01
+# 00 09 = start address, altså registeradresse 9
+# 00 01 = quantity, altså 1 register
+# Det betyder: læs ét register fra adresse 9.
+
+# Eksempel ved læsning af to registre:
+#           00 09  00 02
+# 00 09 = start address, altså registeradresse 9
+# 00 02 = quantity, altså 2 registre
+# Det betyder: læs register 9 og 10.
 # Derfor returnerer decode_read_request() register_address og register_count, men values er None.
 
 # Eksempel ved function code 16: Write Multiple Registers request.
@@ -47,7 +59,16 @@
 # Byte count fortæller hvor mange bytes registerværdierne fylder.
 # Register values er de værdier masteren forsøger at skrive til slaven.
 # Hvert holding register fylder 2 bytes, altså 16 bit.
-# Eksempel: byte-parret 00 2A bliver med u16() til decimalværdien 42.
+
+# Eksempel på request-data efter function_code ved skrivning af 3 registre:
+#           00 09  00 03  06  00 2A  00 10  00 FF
+# 00 09 = start address, altså første registeradresse der skrives til
+# 00 03 = quantity, altså 3 registre
+# 06    = byte_count, altså 6 bytes registerdata
+# 00 2A = registerværdi 1 = 42
+# 00 10 = registerværdi 2 = 16
+# 00 FF = registerværdi 3 = 255
+# Det betyder: skriv værdierne 42, 16 og 255 til register 9, 10 og 11.
 # Derfor returnerer decode_write_request() register_address, register_count og values.
 
 from packet_parser.coils import decode_coils
@@ -66,6 +87,7 @@ def decode_read_request(function_code: int, pdu: bytes):
 
     # u16(pdu, 0) læser de første 2 bytes som startadresse.
     # u16(pdu, 2) læser de næste 2 bytes som antal coils/registers masteren vil læse.
+    # Eksempel: pdu 00 09 00 02 bliver register_address=9 og register_count=2.
     return {
         "register_type": READ_REGISTER_TYPES[function_code],
         "register_address": u16(pdu, 0),
@@ -143,7 +165,7 @@ def decode_write_request(function_code: int, pdu: bytes):
         # Registerværdierne starter efter startadresse, count og byte_count.
         value_bytes = pdu[5:]
         # Hver registerværdi læses som 2 bytes med u16().
-        # Eksempel: byte-parret 00 2A bliver til decimalværdien 42.
+        # Eksempel: 00 2A 00 10 00 FF bliver til values=[42, 16, 255].
         values = [
             u16(value_bytes, offset)
             for offset in range(0, len(value_bytes), 2)

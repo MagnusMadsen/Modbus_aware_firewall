@@ -29,7 +29,7 @@ FLUSH_INTERVAL_SECONDS = int(os.getenv("FLUSH_INTERVAL_SECONDS", "5"))
 # TIMEOUT_EVENT_THROTTLE_SECONDS begrænser hvor ofte timeout-events oprettes, så samme fejl ikke spammer events-tabellen.
 REQUEST_TIMEOUT_SECONDS = float(os.getenv("REQUEST_TIMEOUT_SECONDS", "10.0"))
 LATENCY_SPIKE_MS = float(os.getenv("LATENCY_SPIKE_MS", "1000.0"))
-TIMEOUT_EVENT_THROTTLE_SECONDS = float(os.getenv("TIMEOUT_EVENT_THROTTLE_SECONDS", "60.0"))
+TIMEOUT_EVENT_THROTTLE_SECONDS = float(os.getenv("TIMEOUT_EVENT_THROTTLE_SECONDS", "80.0"))
 
 # SQL touch-intervaller begrænser hvor ofte kendte devices/connections opdaterer last_seen i databasen.
 # Uden denne begrænsning ville samme kendte enhed kunne give mange databasewrites pr. sekund.
@@ -94,29 +94,47 @@ class ModbusStateManager:
         self._maintenance_thread = threading.Thread(target=self._maintenance_loop, daemon=True)
         self._maintenance_thread.start()
 
-    # process(data) modtager én parset observation fra packet_parser/parser.py.
-    # Først flushes metrics hvis intervallet er nået, og gamle requests tjekkes for timeout.
-    # ARP håndteres separat, fordi ARP ikke er Modbus.
-    # Ikke-Modbus trafik ignoreres efter ARP/IP-data er håndteret i parseren.
-    # Modbus requests sendes til _handle_modbus_request(), mens Modbus responses sendes til requests.handle_response().
+    # process(data) er hovedindgangen til ModbusStateManager.
+    # Data kommer fra: capture.py -> parser.py -> state/__init__.py -> manager.process(data).
+    # data er ikke en rå packet længere. Det er et dictionary fra parser.py med f.eks. src_ip, dst_ip, src_mac, dst_mac, protocol, is_modbus, direction, unit_id, function_code og values.
+    # Funktionen henter ikke selv data fra netværket eller databasen. Den modtager én observation som argument og fordeler den videre.
+    # Data sendes videre til trackers afhængigt af hvad observationen indeholder:
+    # ARP -> _handle_arp(data) -> metrics + devices
+    # Modbus request -> _handle_modbus_request(data) -> metrics + devices + connections + registers + requests
+    # Modbus response -> requests.handle_response(data) -> request/response matching + latency/timeout metrics
+    # Ikke-Modbus trafik returneres her, fordi parser.py allerede har læst IP/MAC-felter, men manageren kun tracker ARP og Modbus.
     def process(self, data):
+        # Locken gør at én observation behandles færdig ad gangen.
+        # Det beskytter de lokale caches i devices, connections, requests, registers og metrics.
         with self.lock:
+            # Før ny observation behandles, skrives metrics til metrics_bucket hvis flush-intervallet er nået.
             self.metrics.flush_if_due()
+            # Tjekker om tidligere Modbus requests har ventet for længe på response.
+            # Hvis de er for gamle, kan RequestTracker registrere timeout/failed request.
             self.requests.expire_if_needed()
 
+            # protocol kommer fra parser.py og fortæller hvilket niveau pakken blev parset til: ARP, IP, TCP eller MODBUS.
             protocol = data.get("protocol")
+            # ARP går sin egen vej, fordi ARP ikke har Modbus function_code, unit_id eller request/response-retning.
             if protocol == "ARP":
                 self._handle_arp(data)
                 return
 
+            # Hvis observationen ikke er Modbus, stopper manageren her.
+            # IP/TCP-trafik uden Modbus bruges ikke til register-, request- eller connection-tracking.
             if not data.get("is_modbus"):
                 return
 
+            # Her er observationen bekræftet som Modbus, så den tælles som Modbus-trafik i metrics.
             self.metrics.count_traffic()
 
+            # direction kommer fra parser.py/direction.py.
+            # Request og response behandles forskelligt, fordi de betyder forskellige ting for state-laget.
             if data.get("direction") == "request":
+                # Requesten sendes videre til _handle_modbus_request(), som registrerer master/slave, connection, function code, registerændringer og pending request.
                 self._handle_modbus_request(data)
             elif data.get("direction") == "response":
+                # Responsen sendes til RequestTracker, som matcher den med en tidligere request via transaction_id/IP/unit_id og beregner latency.
                 self.requests.handle_response(data)
 
     # _maintenance_loop() kører i baggrunden én gang i sekundet.
