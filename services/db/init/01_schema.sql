@@ -34,8 +34,9 @@ CREATE TABLE IF NOT EXISTS devices (
         CHECK (role IS NULL OR role IN ('master', 'slave', 'unknown'))
 ); 
 
--- observed_connections definerer Modbus-relationer mellem master og slave.
 -- master_ip og slave_ip er IP-adresser og bruger INET.
+-- master_ip og slave_ip har foreign keys til devices.ip, fordi forbindelser beskriver kendte device-relationer.
+-- ON DELETE CASCADE betyder at forbindelsen fjernes, hvis den tilhørende device-række fjernes.
 -- unit_id er Modbus unit-id og må være NULL, hvis værdien ikke er kendt.
 -- UNIQUE (master_ip, slave_ip, unit_id) gør relationen unik, så request_count og last_seen kan opdateres på samme række.
 -- CHECK sikrer at unit_id holder sig inden for Modbus-området 0-255.
@@ -48,12 +49,22 @@ CREATE TABLE IF NOT EXISTS observed_connections (
     last_seen TIMESTAMP NOT NULL DEFAULT NOW(),
     request_count BIGINT NOT NULL DEFAULT 1,
     UNIQUE (master_ip, slave_ip, unit_id),
+    CONSTRAINT fk_observed_connections_master_ip
+        FOREIGN KEY (master_ip)
+        REFERENCES devices(ip)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_observed_connections_slave_ip
+        FOREIGN KEY (slave_ip)
+        REFERENCES devices(ip)
+        ON DELETE CASCADE,
     CONSTRAINT chk_observed_connections_unit_id
         CHECK (unit_id IS NULL OR unit_id BETWEEN 0 AND 255)
 );
 
 -- modbus_register_state definerer seneste kendte state for Modbus-registre/coils.
 -- slave_ip og unit_id identificerer Modbus-enheden registeret hører til.
+-- slave_ip har foreign key til devices.ip, fordi register-state beskriver state for en kendt slave/device.
+-- ON DELETE CASCADE betyder at register-state fjernes, hvis den tilhørende device-række fjernes.
 -- register_type og register_address identificerer selve registeret.
 -- UNIQUE (slave_ip, unit_id, register_type, register_address) gør at samme register kun har én state-række.
 -- last_value gemmes som TEXT, fordi coils og registerværdier kan have forskellige værdiformater.
@@ -70,6 +81,10 @@ CREATE TABLE IF NOT EXISTS modbus_register_state (
     last_seen TIMESTAMP NOT NULL DEFAULT NOW(),
     write_count BIGINT NOT NULL DEFAULT 0,
     UNIQUE (slave_ip, unit_id, register_type, register_address),
+    CONSTRAINT fk_register_state_slave_ip
+        FOREIGN KEY (slave_ip)
+        REFERENCES devices(ip)
+        ON DELETE CASCADE,
     CONSTRAINT chk_register_state_unit_id
         CHECK (unit_id BETWEEN 0 AND 255),
     CONSTRAINT chk_register_state_register_address
@@ -88,6 +103,8 @@ CREATE TABLE IF NOT EXISTS modbus_register_state (
 -- event_key er en logisk nøgle for samme hændelse og er UNIQUE, så gentagne observationer kan opdatere samme event.
 -- event_type, severity og status beskriver hændelsens type, alvor og aktuelle tilstand.
 -- source_ip, target_ip, unit_id, function_code, register_type og register_address er valgfrie kontekstfelter.
+-- source_ip og target_ip har nullable foreign keys til devices.ip, når hændelsen kan kobles til en kendt device.
+-- ON DELETE SET NULL bevarer eventhistorikken, selv hvis en device-række fjernes.
 -- old_value og new_value kan bruges til før/efter-værdier ved ændringer.
 -- details JSONB bruges til ekstra kontekst, som varierer mellem eventtyper.
 -- CHECK constraints er sidste sikkerhedsnet mod ugyldige eventværdier.
@@ -107,6 +124,14 @@ CREATE TABLE IF NOT EXISTS events (
     old_value TEXT,
     new_value TEXT,
     details JSONB NOT NULL DEFAULT '{}'::jsonb,
+    CONSTRAINT fk_events_source_ip
+        FOREIGN KEY (source_ip)
+        REFERENCES devices(ip)
+        ON DELETE SET NULL,
+    CONSTRAINT fk_events_target_ip
+        FOREIGN KEY (target_ip)
+        REFERENCES devices(ip)
+        ON DELETE SET NULL,
     CONSTRAINT chk_events_severity
         CHECK (severity IN ('info', 'low', 'medium', 'high', 'critical')),
     CONSTRAINT chk_events_status
@@ -163,7 +188,11 @@ CREATE TABLE IF NOT EXISTS alarm_approvals (
     status TEXT NOT NULL,
     handled_by TEXT NOT NULL,
     handled_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    event_id BIGINT REFERENCES events(id) ON DELETE SET NULL,
+    event_id BIGINT,
+    CONSTRAINT fk_alarm_approvals_event_id
+        FOREIGN KEY (event_id)
+        REFERENCES events(id)
+        ON DELETE SET NULL,
     details JSONB NOT NULL DEFAULT '{}'::jsonb,
     CONSTRAINT chk_alarm_approvals_action
         CHECK (action IN ('approve', 'block', 'ignore', 'critical')),
@@ -202,6 +231,8 @@ CREATE TABLE IF NOT EXISTS metrics_bucket (
 
 -- critical_registers definerer regler for vigtige Modbus-registre.
 -- slave_ip, unit_id, register_type og register_address identificerer det register reglen gælder for.
+-- slave_ip har foreign key til devices.ip, fordi reglen knyttes til en kendt slave/device.
+-- ON DELETE CASCADE betyder at register-reglen fjernes, hvis den tilhørende device-række fjernes.
 -- UNIQUE forhindrer modstridende regler for samme slave_ip/unit_id/register_type/register_address.
 -- label er et valgfrit menneskeligt navn, som frontend kan vise.
 -- allowed_values JSONB kan indeholde de værdier backend skal acceptere for registeret.
@@ -219,6 +250,10 @@ CREATE TABLE IF NOT EXISTS critical_registers (
     is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE (slave_ip, unit_id, register_type, register_address),
+    CONSTRAINT fk_critical_registers_slave_ip
+        FOREIGN KEY (slave_ip)
+        REFERENCES devices(ip)
+        ON DELETE CASCADE,
     CONSTRAINT chk_critical_registers_unit_id
         CHECK (unit_id BETWEEN 0 AND 255),
     CONSTRAINT chk_critical_registers_register_address
@@ -267,6 +302,88 @@ BEGIN
     END IF;
 END $$;
 
+
+-- Foreign key migrations til databaser der allerede findes.
+-- State-tabeller bruger CASCADE, fordi de beskriver aktuel state for devices.
+-- Events bruger SET NULL, så historiske hændelser bevares, selv hvis en device-række fjernes.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_observed_connections_master_ip'
+    ) THEN
+        ALTER TABLE observed_connections
+            ADD CONSTRAINT fk_observed_connections_master_ip
+            FOREIGN KEY (master_ip)
+            REFERENCES devices(ip)
+            ON DELETE CASCADE;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_observed_connections_slave_ip'
+    ) THEN
+        ALTER TABLE observed_connections
+            ADD CONSTRAINT fk_observed_connections_slave_ip
+            FOREIGN KEY (slave_ip)
+            REFERENCES devices(ip)
+            ON DELETE CASCADE;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_register_state_slave_ip'
+    ) THEN
+        ALTER TABLE modbus_register_state
+            ADD CONSTRAINT fk_register_state_slave_ip
+            FOREIGN KEY (slave_ip)
+            REFERENCES devices(ip)
+            ON DELETE CASCADE;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_events_source_ip'
+    ) THEN
+        ALTER TABLE events
+            ADD CONSTRAINT fk_events_source_ip
+            FOREIGN KEY (source_ip)
+            REFERENCES devices(ip)
+            ON DELETE SET NULL;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_events_target_ip'
+    ) THEN
+        ALTER TABLE events
+            ADD CONSTRAINT fk_events_target_ip
+            FOREIGN KEY (target_ip)
+            REFERENCES devices(ip)
+            ON DELETE SET NULL;
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_critical_registers_slave_ip'
+    ) THEN
+        ALTER TABLE critical_registers
+            ADD CONSTRAINT fk_critical_registers_slave_ip
+            FOREIGN KEY (slave_ip)
+            REFERENCES devices(ip)
+            ON DELETE CASCADE;
+    END IF;
+END $$;
+
 -- Indexes gør opslag hurtigere på kolonner backend ofte søger, filtrerer eller sorterer på.
 -- Et index kan sammenlignes med et register i en bog: PostgreSQL kan finde relevante rækker uden at læse hele tabellen.
 -- Indexes ændrer ikke data og bestemmer ikke hvad der må gemmes. Det gør constraints.
@@ -306,6 +423,15 @@ CREATE INDEX IF NOT EXISTS idx_events_key
 -- Eksempel: åbne events i dashboardet, nyeste først.
 CREATE INDEX IF NOT EXISTS idx_events_status_ts
     ON events (status, ts DESC);
+
+
+-- Gør opslag efter source_ip og target_ip hurtigere.
+-- Bruges når dashboardet eller backend skal vise hændelser for en bestemt device.
+CREATE INDEX IF NOT EXISTS idx_events_source_ip
+    ON events (source_ip);
+
+CREATE INDEX IF NOT EXISTS idx_events_target_ip
+    ON events (target_ip);
 
 -- Gør det hurtigere at hente metrics i tidsorden.
 -- Bruges til grafer hvor backend/frontend henter de nyeste metrics buckets.
