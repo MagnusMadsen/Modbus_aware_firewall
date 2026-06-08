@@ -115,10 +115,12 @@ class DeviceTracker:
 
         # Hvis samme IP ses med en anden MAC, oprettes et identity_mac_changed event.
         # Det kan indikere ARP spoofing, MITM eller udskiftet netværksenhed.
+        # Event-key indeholder tidspunktet, så hvert MAC-skift gemmes som en ny alarm.
+        # Det betyder at A -> B, B -> A og A -> B igen alle bliver synlige i events-tabellen.
         if mac_changed:
             # Sender MAC-skiftet videre til events-tabellen via storage-laget.
             event_id = self.writer.insert_event(
-                event_key=f"identity_mac_changed:{ip}",
+                event_key=f"identity_mac_changed:{ip}:{old_mac}:{normalized_mac}:{current_time.isoformat()}",
                 event_type="identity_mac_changed",
                 severity="high",
                 source_ip=ip,
