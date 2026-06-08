@@ -2,7 +2,7 @@
 # Filen sætter netværksinterface op, starter Scapy sniff(), og sender hver fanget packet videre i programmet.
 # capture.py læser ikke selv Ethernet-, IP-, TCP-, MBAP- eller Modbus-felter.
 # Den modtager en rå Scapy-packet fra sniff(), sender den til packet_parser/parser.py, og sender derefter parserens data-dict videre til state-laget.
-#
+
 # Flowet i denne fil:
 # start_capture_thread()
 # └─ run_capture()
@@ -13,7 +13,7 @@
 #             ├─ parse_packet(pkt)
 #             └─ process_observation(data)
 #                └─ state/manager.py behandler observationen videre
-#
+
 # Hele pakken som Scapy fanger kan forstås sådan her hvilket også bliver refereret i packet_parser/parser.py:
 # Ethernet frame
 # ┌──────────────┬──────────────┬────────────┬───────────────┬───────────────┬──────────────────────────────────────────┐
@@ -42,7 +42,7 @@ from scapy.error import Scapy_Exception
 from packet_parser import parse_packet
 from state import process_observation
 
-#
+
 # CAPTURE_INTERFACE er det netværksinterface der lyttes på. Standard er eth0.
 # CAPTURE_FILTER er et BPF-filter til Scapy/libpcap-laget.
 # BPF står for Berkeley Packet Filter.
