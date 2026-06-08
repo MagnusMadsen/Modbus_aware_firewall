@@ -85,3 +85,5 @@ def init_state_manager() -> ModbusStateManager:
 def process_observation(data: dict) -> None:
     manager = init_state_manager()
     manager.process(data)
+
+    
