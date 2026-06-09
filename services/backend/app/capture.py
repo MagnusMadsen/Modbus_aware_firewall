@@ -191,6 +191,7 @@ def setup_switch_interface() -> None:
 # store=False betyder at Scapy ikke gemmer alle pakker i RAM.
 # promisc=True beder Scapy om promiscuous mode under sniffing.
 # filter=CAPTURE_FILTER begrænser capture til ARP og Modbus TCP-trafik.
+# str = eth0 fordi det er en string. 
 def start_capture(interface: str) -> None:
     setup_interface(interface)
     logger.info("Starting sniff on interface: %s with filter: %s", interface, CAPTURE_FILTER)

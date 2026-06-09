@@ -17,6 +17,14 @@
 #        │              │              └─ pkt[IP].src / pkt[IP].dst hvis pakken har IP-lag
 #        │              └─ pkt[Ether].src
 #        └─ pkt[Ether].dst
+#                                                                                          │
+#                                                                                          ▼
+#             TCP payload ved Modbus TCP
+#             ┌──────────────────────────── MBAP header ────────────────────────────┬────────────── Modbus PDU ──────────────┐
+#             │ Transaction ID │ Protocol ID │ Length │ Unit ID │ Function Code     │ Data                                   │
+#             │ 2 bytes        │ 2 bytes     │ 2 bytes│ 1 byte  │ 1 byte            │ Det som denne fil kalder pdu           │
+#             └────────────────┴─────────────┴────────┴─────────┴───────────────────┴────────────────────────────────────────┘
+
 
 # ARP-pakker stopper før IP/TCP/Modbus.
 # ARP ligger direkte efter Ethernet-laget, så ARP-IP'er læses fra pkt[ARP].psrc og pkt[ARP].pdst.
@@ -39,7 +47,7 @@ from packet_parser.request import decode_request_fields
 from packet_parser.response import decode_response_fields
 
 
-# parse_packet() læser pakken lag for lag og bygger en data-dictionary.
+# parse_packet() læser pakken lag for lag og bygger et data-dictionary.
 # 1. base_observation(pkt) opretter standardfelter med None/False.
 # 2. Ether-laget læses først, fordi MAC-adresser ligger yderst i Ethernet-framen.
 # 3. Hvis pakken er ARP, læses ARP-IP'er og funktionen returnerer med det samme.
@@ -60,7 +68,7 @@ def parse_packet(pkt):
         data["src_mac"] = pkt[Ether].src
         data["dst_mac"] = pkt[Ether].dst
 
-    # ARP håndteres tidligt, fordi ARP ikke indeholder IP/TCP/Modbus på samme måde som TCP-trafik.
+    # ARP håndteres tidligt, fordi ARP ikke indeholder IPHEADER/TCP/Modbus på samme måde som TCP-trafik.
     # ARP-IP'er læses fra pkt[ARP].psrc og pkt[ARP].pdst.
     if pkt.haslayer(ARP):
         data["protocol"] = "ARP"
