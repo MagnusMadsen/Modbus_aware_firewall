@@ -107,3 +107,5 @@ def insert_event(
     # Returnerer events.id til den kode der oprettede eventen.
     # Det er koblingen frontend senere bruger til alarm_approvals.event_id.
     return row["id"] if row else None
+
+
