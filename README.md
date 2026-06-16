@@ -792,4 +792,5 @@ Mulige fremtidige forbedringer:
 
 ## Licens
 
-Der findes ikke en license-fil i repositoryet på nuværende tidspunkt. Tilføj en licens før andre forventes at bruge, ændre eller videredistribuere projektet.
+Dette projekt er licenseret under MIT License. Se [LICENSE](LICENSE) for detaljer.
+
