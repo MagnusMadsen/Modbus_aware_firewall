@@ -221,9 +221,6 @@ flowchart LR
     P[(Redis)] --> N
 ```
 
-<p align="center">
-  <img src="docs/images/system_overview.png" alt="Samlet systemoverblik" width="900">
-</p>
 
 ### Backend-flow
 
