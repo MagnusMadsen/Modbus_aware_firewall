@@ -8,6 +8,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      TZ: Europe/Copenhagen
+      PGTZ: Europe/Copenhagen
     secrets:
       - postgres_password
     volumes:

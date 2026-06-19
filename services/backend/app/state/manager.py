@@ -27,9 +27,9 @@ FLUSH_INTERVAL_SECONDS = int(os.getenv("FLUSH_INTERVAL_SECONDS", "5"))
 # REQUEST_TIMEOUT_SECONDS er hvor længe en Modbus request må mangle svar før den kan tælles som timeout.
 # LATENCY_SPIKE_MS er grænsen for hvornår en response vurderes som latency spike.
 # TIMEOUT_EVENT_THROTTLE_SECONDS begrænser hvor ofte timeout-events oprettes, så samme fejl ikke spammer events-tabellen.
-REQUEST_TIMEOUT_SECONDS = float(os.getenv("REQUEST_TIMEOUT_SECONDS", "10.0"))
+REQUEST_TIMEOUT_SECONDS = float(os.getenv("REQUEST_TIMEOUT_SECONDS", "40.0"))
 LATENCY_SPIKE_MS = float(os.getenv("LATENCY_SPIKE_MS", "1000.0"))
-TIMEOUT_EVENT_THROTTLE_SECONDS = float(os.getenv("TIMEOUT_EVENT_THROTTLE_SECONDS", "80.0"))
+TIMEOUT_EVENT_THROTTLE_SECONDS = float(os.getenv("TIMEOUT_EVENT_THROTTLE_SECONDS", "200.0"))
 
 # SQL touch-intervaller begrænser hvor ofte kendte devices/connections opdaterer last_seen i databasen.
 # Uden denne begrænsning ville samme kendte enhed kunne give mange databasewrites pr. sekund.
