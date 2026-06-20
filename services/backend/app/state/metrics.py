@@ -122,24 +122,6 @@ class MetricsTracker:
                 },
             )
 
-        # Hvis der er failed requests i bucket'et, oprettes et failed_requests-event.
-        if self.current["failed_count"] > 0:
-            # Sender failed_requests-hændelsen videre til events-tabellen via storage-laget.
-            self.writer.insert_event(
-                event_key=f"failed_requests:{bucket_label}",
-                event_type="failed_requests",
-                severity="high",
-                details={
-                    "message": "Failed Modbus requests observed in metrics bucket",
-                    "bucket_ts": bucket_label,
-                    "traffic_count": self.current["traffic_count"],
-                    "request_count": self.current["request_count"],
-                    "response_count": self.current["response_count"],
-                    "failed_count": self.current["failed_count"],
-                    "is_pinned": True,
-                    "pin_reason": "One or more failed requests were observed",
-                },
-            )
 
         # Når bucket'et er skrevet til databasen, starter trackerens næste bucket.
         self.bucket_ts = current_bucket
