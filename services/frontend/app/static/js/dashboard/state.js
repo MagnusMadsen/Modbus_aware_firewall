@@ -25,7 +25,7 @@
 // 60 betyder: vis de 60 nyeste datapunkter, når grafen er i live-visning.
 // MIN_WINDOW_POINTS er mindste zoom-vindue.
 // 12 betyder: brugeren må ikke zoome længere ind end 12 datapunkter.
-const LIVE_WINDOW_POINTS = 360;
+const LIVE_WINDOW_POINTS = 60;
 const MIN_WINDOW_POINTS = 10;
 
 // state er objektet hvor frontend gemmer dashboardets aktuelle tilstand.
