@@ -68,7 +68,7 @@ def get_metric_rows():
             AND latency_event.status = 'open'
             AND latency_event.ts >= mb.bucket_ts - INTERVAL '5 seconds'
             AND latency_event.ts < mb.bucket_ts + INTERVAL '5 seconds'
-        WHERE mb.bucket_ts >= NOW() - INTERVAL '30 minutes'
+        WHERE mb.bucket_ts >= NOW() - INTERVAL '2 hours'
         ORDER BY mb.bucket_ts
         """
     )
