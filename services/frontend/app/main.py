@@ -214,7 +214,7 @@ def get_dashboard_data():
 # /login viser login-formularen og håndterer login-submit.
 # Login-forsøg rate-limites med 3 forsøg pr. minut.
 @app.route("/login", methods=["GET", "POST"])
-@limiter.limit("3 per minute")
+@limiter.limit("30 per minute")
 def login():
     # Hvis brugeren allerede er logget ind i frontend-sessionen, sendes brugeren til dashboardet.
     if session.get("authenticated"):
