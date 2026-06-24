@@ -17,7 +17,7 @@
 #                                                                                  │
 #                                                                                  ▼
 #             TCP payload ved Modbus TCP
-#             ┌──────────────────────────── MBAP header ────────────────────────────┬────────────── Modbus PDU ──────────────┐
+#             ┌──────────────────────────── MBAP header ────────│─────────────── Modbus PDU ─────────────────────────────────┐
 #             │ Transaction ID │ Protocol ID │ Length │ Unit ID │ Function Code     │ Data                                   │
 #             │ 2 bytes        │ 2 bytes     │ 2 bytes│ 1 byte  │ 1 byte            │ Varierer efter function code           │
 #             └────────────────┴─────────────┴────────┴─────────┴───────────────────┴────────────────────────────────────────┘

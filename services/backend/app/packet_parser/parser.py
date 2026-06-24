@@ -162,3 +162,4 @@ def parse_packet(pkt):
 
     # Returnerer én samlet observation til capture.py, som derefter sender den videre til process_observation(data).
     return data
+

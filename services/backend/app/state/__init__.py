@@ -15,6 +15,7 @@
 #   self.requests = RequestTracker(...)
 #   self.metrics = MetricsTracker(...)
 
+# simpelton akitektur 
 
 # state/__init__.py er adgangslaget ind til ModbusStateManager.
 # capture.py sender parsede pakker hertil med process_observation(data).

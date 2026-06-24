@@ -33,6 +33,7 @@ TIMEOUT_EVENT_THROTTLE_SECONDS = float(os.getenv("TIMEOUT_EVENT_THROTTLE_SECONDS
 
 # SQL touch-intervaller begrænser hvor ofte kendte devices/connections opdaterer last_seen i databasen.
 # Uden denne begrænsning ville samme kendte enhed kunne give mange databasewrites pr. sekund.
+# dette er en instants variable 
 DEVICE_SQL_TOUCH_SECONDS = int(os.getenv("DEVICE_SQL_TOUCH_SECONDS", "120"))
 CONNECTION_SQL_TOUCH_SECONDS = int(os.getenv("CONNECTION_SQL_TOUCH_SECONDS", "120"))
 
